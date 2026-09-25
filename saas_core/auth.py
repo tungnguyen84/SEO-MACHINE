@@ -6,7 +6,9 @@ import hashlib
 from typing import Optional, Dict, Any
 from core.database import get_user_by_email, get_user_by_id, verify_password, create_user
 
-SECRET_KEY = "openseo-commercial-saas-super-secret-key-2026"
+import os
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "openseo-dev-key-change-in-prod"
 
 class SaaSAuthManager:
     """

@@ -105,11 +105,12 @@ class SourceIngestionEngine:
     def check_content_hash_staleness(cls, url: str, current_hash: str) -> bool:
         """
         Checks if source content hash changed from previous recorded fetch.
-        If hash changed, marks older evidence as STALE.
+        If hash changed, marks older evidence as STALE and triggers downstream
+        invalidation for dependent compatibility matrices and articles.
         """
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, content_hash FROM sources WHERE url = ? ORDER BY id DESC LIMIT 1", (url,))
+        cursor.execute("SELECT id, entity_id, content_hash FROM sources WHERE url = ? ORDER BY id DESC LIMIT 1", (url,))
         row = cursor.fetchone()
 
         is_stale = False
@@ -118,13 +119,92 @@ class SourceIngestionEngine:
             if prev_hash != current_hash:
                 is_stale = True
                 source_id = row["id"]
-                # Mark previous evidence claims as STALE in revalidation queue
+                entity_id = row["entity_id"]
+
+                # 1. Mark previous evidence claims as STALE
                 cursor.execute("UPDATE evidence_claims SET status = 'STALE' WHERE source_id = ?", (source_id,))
                 cursor.execute("UPDATE sources SET is_stale = 1 WHERE id = ?", (source_id,))
+
+                # 2. Mark dependent claims as STALE / NEEDS_REVALIDATION
+                cursor.execute("""
+                UPDATE claim_validations SET validation_status = 'NEEDS_REVALIDATION'
+                WHERE evidence_id IN (SELECT id FROM evidence_claims WHERE source_id = ?)
+                """, (source_id,))
+
+                # 3. Downstream Invalidation: Compatibility Matrix -> NEEDS_RECALCULATION
+                if entity_id:
+                    cursor.execute("""
+                    UPDATE compatibility_matrix 
+                    SET compatibility_status = 'NEEDS_RECALCULATION' 
+                    WHERE subject_entity_id = ? OR target_entity_id = ?
+                    """, (entity_id, entity_id))
+                    
+                    # 4. Downstream Invalidation: Articles -> NEEDS_REVALIDATION
+                    cursor.execute("""
+                    UPDATE articles 
+                    SET quality_decision = 'NEEDS_REVALIDATION' 
+                    WHERE primary_entity_id = ?
+                    """, (entity_id,))
+
+                # 5. Record Invalidation Audit Log
+                import json
+                inv_log = {
+                    "source_id": source_id,
+                    "entity_id": entity_id,
+                    "prev_hash": prev_hash[:8] + "...",
+                    "new_hash": current_hash[:8] + "...",
+                    "action": "DOWNSTREAM_INVALIDATION_TRIGGERED"
+                }
+                cursor.execute("""
+                INSERT INTO audit_logs (action, entity_type, entity_id, actor, details_json)
+                VALUES ('DOWNSTREAM_INVALIDATION', 'source', ?, 'system', ?)
+                """, (entity_id, json.dumps(inv_log)))
+
                 conn.commit()
 
         conn.close()
         return is_stale
+
+    @classmethod
+    def trace_dependency_graph(cls, source_id: int) -> Dict[str, Any]:
+        """
+        Traces the downstream object lineage:
+        SOURCE -> EVIDENCE -> FACT -> CALCULATION/COMPATIBILITY -> CLAIM -> ARTICLE
+        """
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, entity_id, url, source_type, is_stale FROM sources WHERE id = ?", (source_id,))
+        src = cursor.fetchone()
+        if not src:
+            conn.close()
+            return {"error": "Source not found"}
+
+        entity_id = src["entity_id"]
+        cursor.execute("SELECT id, attribute_key, status FROM evidence_claims WHERE source_id = ?", (source_id,))
+        evidence_rows = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute("""
+        SELECT id, subject_entity_id, target_entity_id, compatibility_status 
+        FROM compatibility_matrix 
+        WHERE subject_entity_id = ? OR target_entity_id = ?
+        """, (entity_id, entity_id))
+        compat_rows = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute("""
+        SELECT id, title, quality_decision, status 
+        FROM articles 
+        WHERE primary_entity_id = ?
+        """, (entity_id,))
+        article_rows = [dict(r) for r in cursor.fetchall()]
+
+        conn.close()
+        return {
+            "source": dict(src),
+            "evidence_count": len(evidence_rows),
+            "evidence_claims": evidence_rows,
+            "compatibility_matrices": compat_rows,
+            "dependent_articles": article_rows
+        }
 
     @classmethod
     def ingest_structured_source(
@@ -201,6 +281,21 @@ class SourceIngestionEngine:
                     existing_p = p_row["priority"]
                     # If incoming source has lower authority (higher integer), do not override!
                     if priority > existing_p:
+                        import json
+                        conflict_payload = {
+                            "event": "SOURCE_CONFLICT_DETECTED",
+                            "entity_id": entity_id,
+                            "attribute": attr_key,
+                            "existing_priority": existing_p,
+                            "incoming_priority": priority,
+                            "existing_value": existing_info.get("value_text") or existing_info.get("value_num"),
+                            "rejected_incoming_value": str(raw_val),
+                            "action": "PRESERVED_HIGHER_AUTHORITY_OEM"
+                        }
+                        cursor.execute("""
+                        INSERT INTO audit_logs (action, entity_type, entity_id, actor, details_json)
+                        VALUES ('SOURCE_CONFLICT_DETECTED', 'entity', ?, 'system', ?)
+                        """, (entity_id, json.dumps(conflict_payload)))
                         continue
 
             # Normalize attribute

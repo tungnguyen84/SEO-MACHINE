@@ -27,10 +27,10 @@ class JobTracker:
         cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO jobs (
-            id, workspace_id, project_id, job_type, status,
+            id, workspace_id, project_id, job_type, task_type, status,
             progress, retry_count, input_summary, created_at
-        ) VALUES (?, ?, ?, ?, 'QUEUED', 0, 0, ?, CURRENT_TIMESTAMP)
-        """, (job_id, workspace_id, project_id, job_type, input_summary))
+        ) VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, ?, CURRENT_TIMESTAMP)
+        """, (job_id, workspace_id, project_id, job_type, job_type, input_summary))
         conn.commit()
         conn.close()
         return job_id
@@ -76,7 +76,7 @@ class JobTracker:
         cursor.execute("""
         UPDATE jobs SET
             status = ?,
-            error = ?,
+            error_msg = ?,
             finished_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """, (status, error_msg, job_id))

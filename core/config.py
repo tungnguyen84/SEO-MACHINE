@@ -17,6 +17,13 @@ class Settings:
     # Publishing Safe Gate
     AUTO_PUBLISH: bool = os.getenv("AUTO_PUBLISH", "false").lower() == "true"
 
+    # Production Integrity & Anti-Hallucination Flags
+    FAIL_ON_UNSUPPORTED_CRITICAL_CLAIM: bool = os.getenv("FAIL_ON_UNSUPPORTED_CRITICAL_CLAIM", "true").lower() == "true"
+    FAIL_ON_UNRESOLVED_DATA_CONFLICT: bool = os.getenv("FAIL_ON_UNRESOLVED_DATA_CONFLICT", "true").lower() == "true"
+    REQUIRE_PRIMARY_EVIDENCE: bool = os.getenv("REQUIRE_PRIMARY_EVIDENCE", "true").lower() == "true"
+    ALLOW_FAKE_TESTING_CLAIMS: bool = os.getenv("ALLOW_FAKE_TESTING_CLAIMS", "false").lower() == "true"
+    ALLOW_FAKE_FALLBACK_DATA: bool = os.getenv("ALLOW_FAKE_FALLBACK_DATA", "false").lower() == "true"
+
     # WordPress
     WP_URL: str = os.getenv("WP_URL", "").rstrip("/")
     WP_USERNAME: str = os.getenv("WP_USERNAME", "")

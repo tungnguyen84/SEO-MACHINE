@@ -242,3 +242,97 @@ class WordPressClient:
             }
         return f'<script type="application/ld+json">\n{json.dumps(schema, indent=2)}\n</script>'
 
+    def safe_idempotent_publish(
+        self,
+        local_article_id: int,
+        title: str,
+        content: str,
+        slug: Optional[str] = None,
+        max_retries: int = 3,
+        backoff_seconds: float = 0.5
+    ) -> Dict[str, Any]:
+        """
+        Publishes content with:
+        1. Idempotency Check: queries WP for existing post by slug/title to prevent duplicates.
+        2. Exponential Backoff Retry on transient errors (429, 500, timeout).
+        3. Immediate halt on auth errors (401, 403).
+        4. Preservation of local article (never loses local draft).
+        """
+        import time
+        from core.observability.job_tracker import JobTracker
+
+        job_id = JobTracker.create_job(
+            job_type="wordpress_publish",
+            input_summary=f"Publish local_article_id={local_article_id}, title='{title[:40]}...'"
+        )
+        JobTracker.start_job(job_id)
+
+        # 1. Idempotency Check
+        try:
+            search_param = slug or title
+            check_res = requests.get(
+                f"{self.api_url}/posts",
+                headers=self.headers,
+                params={"slug": slug} if slug else {"search": title},
+                timeout=10
+            )
+            if check_res.status_code == 200:
+                existing_posts = check_res.json()
+                if existing_posts:
+                    matched = existing_posts[0]
+                    JobTracker.complete_job(job_id, f"Found existing post (id={matched['id']}). Idempotency preserved.")
+                    return {
+                        "success": True,
+                        "is_duplicate_prevented": True,
+                        "post_id": matched.get("id"),
+                        "link": matched.get("link"),
+                        "status": matched.get("status")
+                    }
+        except Exception as e:
+            # If search fails, continue to creation retry loop
+            pass
+
+        # 2. Publish with Exponential Backoff
+        attempt = 0
+        last_error = None
+        while attempt < max_retries:
+            attempt += 1
+            try:
+                pub_res = self.create_post(title=title, content=content, slug=slug)
+                if pub_res.get("success"):
+                    JobTracker.complete_job(job_id, f"Post created successfully (id={pub_res.get('post_id')}) on attempt {attempt}.")
+                    return {**pub_res, "attempts": attempt, "job_id": job_id}
+
+                status_code = pub_res.get("status_code", 0)
+                error_msg = pub_res.get("error", "Unknown error")
+
+                # Immediate halt on auth failures
+                if status_code in [401, 403]:
+                    JobTracker.fail_job(job_id, f"Authentication/Authorization Failed (HTTP {status_code}): {error_msg}")
+                    return {
+                        "success": False,
+                        "status": "AUTH_FAILED",
+                        "status_code": status_code,
+                        "error": error_msg,
+                        "attempts": attempt,
+                        "local_article_preserved": True
+                    }
+
+                # Transient errors: 429 (rate limit), 500/502/503 (server error)
+                last_error = f"HTTP {status_code}: {error_msg}"
+                time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+
+            except Exception as ex:
+                last_error = str(ex)
+                time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+
+        JobTracker.fail_job(job_id, f"Publishing failed after {max_retries} attempts: {last_error}")
+        return {
+            "success": False,
+            "status": "RETRY_EXHAUSTED",
+            "error": last_error,
+            "attempts": max_retries,
+            "local_article_preserved": True
+        }
+
+

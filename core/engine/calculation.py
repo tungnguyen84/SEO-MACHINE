@@ -2,7 +2,29 @@
 Engineering & Physics Calculation Engine
 Performs ground-truth physics formulas for battery runtimes, thermal loss, solar input, and dimensional clearances.
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from enum import Enum
+
+class InputProvenance(str, Enum):
+    MEASURED = "MEASURED"
+    SOURCE_VERIFIED = "SOURCE_VERIFIED"
+    USER_INPUT = "USER_INPUT"
+    MANUFACTURER_SPEC = "MANUFACTURER_SPEC"
+    ASSUMPTION = "ASSUMPTION"
+    MODELLED = "MODELLED"
+    DEFAULT = "DEFAULT"
+
+class CalculationProvenance(str, Enum):
+    VERIFIED_CALCULATION = "VERIFIED_CALCULATION"
+    ESTIMATED_CALCULATION = "ESTIMATED_CALCULATION"
+    MODELLED_CALCULATION = "MODELLED_CALCULATION"
+
+class ProvenanceFloat(float):
+    def __new__(cls, value, provenance=InputProvenance.DEFAULT.value, unit=None):
+        instance = super().__new__(cls, float(value))
+        instance.provenance = provenance
+        instance.unit = unit
+        return instance
 
 class CalculationEngine:
     """Scientific calculations for electrical systems, battery banks, and vehicle installations."""
@@ -12,6 +34,10 @@ class CalculationEngine:
         try:
             from core.database import get_connection
             import json
+            # Ensure float serialization
+            def clean_dict(d):
+                return {k: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v for k, v in d.items()}
+
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
@@ -20,10 +46,10 @@ class CalculationEngine:
             """, (
                 entity_id,
                 calc_type,
-                json.dumps(inputs),
+                json.dumps(clean_dict(inputs)),
                 "v1.2-physics",
-                json.dumps(assumptions),
-                json.dumps(output)
+                json.dumps(clean_dict(assumptions)),
+                json.dumps(clean_dict(output))
             ))
             conn.commit()
             conn.close()
@@ -52,33 +78,72 @@ class CalculationEngine:
         runtime_hours = usable_wh / device_watts
         days = runtime_hours / 24.0
 
+        p_batt = ProvenanceFloat(battery_wh, InputProvenance.MANUFACTURER_SPEC.value, "Wh")
+        p_dev = ProvenanceFloat(device_watts, InputProvenance.MANUFACTURER_SPEC.value, "W")
+        p_eff = ProvenanceFloat(eff, InputProvenance.ASSUMPTION.value)
+        p_dod = ProvenanceFloat(depth_of_discharge, InputProvenance.ASSUMPTION.value)
+
         inputs = {
-            "battery_wh": battery_wh,
-            "device_watts": device_watts,
+            "battery_wh": p_batt,
+            "device_watts": p_dev,
             "is_ac_load": is_ac_load
         }
+        input_provenance = {
+            "battery_wh": InputProvenance.MANUFACTURER_SPEC.value,
+            "device_watts": InputProvenance.MANUFACTURER_SPEC.value,
+            "is_ac_load": InputProvenance.USER_INPUT.value
+        }
         assumptions = {
-            "depth_of_discharge": depth_of_discharge,
-            "inverter_efficiency": eff,
+            "depth_of_discharge": p_dod,
+            "inverter_efficiency": p_eff,
             "voltage_decay_loss": "factored into DoD",
             "ambient_temp_factor": "nominal 77F"
         }
+        assumption_provenance = {
+            "depth_of_discharge": InputProvenance.ASSUMPTION.value,
+            "inverter_efficiency": InputProvenance.ASSUMPTION.value,
+            "voltage_decay_loss": InputProvenance.ASSUMPTION.value,
+            "ambient_temp_factor": InputProvenance.DEFAULT.value
+        }
+
+        has_modelled = any(
+            p in [InputProvenance.MODELLED.value, InputProvenance.ASSUMPTION.value]
+            for p in list(input_provenance.values()) + list(assumption_provenance.values())
+        )
+        provenance_class = CalculationProvenance.ESTIMATED_CALCULATION.value if has_modelled else CalculationProvenance.VERIFIED_CALCULATION.value
+        confidence = 0.90 if has_modelled else 0.99
+
+        display_str = (
+            f"Estimated runtime: ~{round(runtime_hours, 1)} hours "
+            f"({round(days, 1)} days)" if days >= 1.0 else f"Estimated runtime: ~{round(runtime_hours, 1)} hours"
+        )
+
         output = {
+            "value": round(runtime_hours, 1),
+            "unit": "hours",
+            "confidence": confidence,
+            "provenance_class": provenance_class,
             "battery_nominal_wh": battery_wh,
             "device_watts": device_watts,
             "usable_wh": round(usable_wh, 1),
             "efficiency_factor": round(eff, 2),
             "runtime_hours": round(runtime_hours, 1),
             "runtime_days": round(days, 2),
-            "display_str": f"{round(runtime_hours, 1)} hours ({round(days, 1)} days)" if days >= 1.0 else f"{round(runtime_hours, 1)} hours"
+            "display_str": display_str
         }
 
         CalculationEngine._log_calculation("power_runtime", inputs, assumptions, output, entity_id)
 
         return {
+            "value": round(runtime_hours, 1),
+            "unit": "hours",
+            "confidence": confidence,
+            "provenance_class": provenance_class,
             "formula_version": "v1.2-physics",
             "inputs": inputs,
+            "input_provenance": input_provenance,
             "assumptions": assumptions,
+            "assumption_provenance": assumption_provenance,
             "output": output,
             **output
         }
@@ -100,32 +165,67 @@ class CalculationEngine:
         - Ambient 90°F (warm car): ~45% duty cycle
         - Ambient 100°F (baking vehicle): ~65% duty cycle
         """
-        # Linear approximation of duty cycle based on ambient temperature
         delta_t = max(5.0, ambient_temp_f - fridge_target_temp_f)
         duty_cycle = min(0.90, max(0.15, (delta_t / 100.0) * 0.70))
 
         eff = 0.95 if is_dc_12v else 0.85
         usable_wh = battery_wh * 0.90 * eff
 
-        # Average continuous power draw
         avg_continuous_watts = fridge_rated_watts * duty_cycle
         daily_wh_consumption = avg_continuous_watts * 24.0
         runtime_hours = usable_wh / avg_continuous_watts
         runtime_days = runtime_hours / 24.0
 
+        p_batt = ProvenanceFloat(battery_wh, InputProvenance.MANUFACTURER_SPEC.value, "Wh")
+        p_watts = ProvenanceFloat(fridge_rated_watts, InputProvenance.MANUFACTURER_SPEC.value, "W")
+        p_ambient = ProvenanceFloat(ambient_temp_f, InputProvenance.USER_INPUT.value if ambient_temp_f != 77.0 else InputProvenance.DEFAULT.value, "deg_F")
+        p_target = ProvenanceFloat(fridge_target_temp_f, InputProvenance.DEFAULT.value, "deg_F")
+        p_duty = ProvenanceFloat(round(duty_cycle * 100, 1), InputProvenance.MODELLED.value, "percent")
+
         inputs = {
-            "battery_wh": battery_wh,
-            "fridge_rated_watts": fridge_rated_watts,
-            "ambient_temp_f": ambient_temp_f,
-            "fridge_target_temp_f": fridge_target_temp_f,
+            "battery_wh": p_batt,
+            "fridge_rated_watts": p_watts,
+            "ambient_temp_f": p_ambient,
+            "fridge_target_temp_f": p_target,
             "is_dc_12v": is_dc_12v
+        }
+        input_provenance = {
+            "battery_wh": InputProvenance.MANUFACTURER_SPEC.value,
+            "fridge_rated_watts": InputProvenance.MANUFACTURER_SPEC.value,
+            "ambient_temp_f": InputProvenance.USER_INPUT.value if ambient_temp_f != 77.0 else InputProvenance.DEFAULT.value,
+            "fridge_target_temp_f": InputProvenance.DEFAULT.value,
+            "is_dc_12v": InputProvenance.ASSUMPTION.value
         }
         assumptions = {
             "cooling_duty_cycle_formula": "min(0.90, max(0.15, (ambient - target)/100 * 0.70))",
+            "duty_cycle": p_duty,
             "dc_conversion_efficiency": eff,
             "usable_capacity_dod": 0.90
         }
+        assumption_provenance = {
+            "cooling_duty_cycle_formula": InputProvenance.MODELLED.value,
+            "duty_cycle": InputProvenance.MODELLED.value,
+            "dc_conversion_efficiency": InputProvenance.ASSUMPTION.value,
+            "usable_capacity_dod": InputProvenance.ASSUMPTION.value
+        }
+
+        # Uncertainty inheritance: any critical MODELLED or ASSUMPTION forces MODELLED_CALCULATION
+        has_modelled = any(
+            p in [InputProvenance.MODELLED.value, InputProvenance.ASSUMPTION.value]
+            for p in list(input_provenance.values()) + list(assumption_provenance.values())
+        )
+        provenance_class = CalculationProvenance.MODELLED_CALCULATION.value if has_modelled else CalculationProvenance.VERIFIED_CALCULATION.value
+        confidence = 0.88 if has_modelled else 0.98
+
+        display_str = (
+            f"Estimated runtime: ~{round(runtime_hours, 1)} hours "
+            f"(~{round(runtime_days, 1)} days at {ambient_temp_f}°F ambient, duty cycle ~{round(duty_cycle * 100, 1)}%) "
+            f"under stated thermodynamic assumptions."
+        )
+
         output = {
+            "value": round(runtime_hours, 1),
+            "unit": "hours",
             "battery_nominal_wh": battery_wh,
             "fridge_rated_watts": fridge_rated_watts,
             "ambient_temp_f": ambient_temp_f,
@@ -134,12 +234,57 @@ class CalculationEngine:
             "daily_wh_consumption": round(daily_wh_consumption, 1),
             "runtime_hours": round(runtime_hours, 1),
             "runtime_days": round(runtime_days, 2),
-            "display_str": f"{round(runtime_hours, 1)} hours ({round(runtime_days, 1)} days at {ambient_temp_f}°F ambient)"
+            "confidence": confidence,
+            "provenance_class": provenance_class,
+            "display_str": display_str
         }
 
         CalculationEngine._log_calculation("fridge_runtime", inputs, assumptions, output, entity_id)
 
         return {
+            "value": round(runtime_hours, 1),
+            "unit": "hours",
+            "confidence": confidence,
+            "provenance_class": provenance_class,
+            "formula_version": "v1.2-physics",
+            "inputs": inputs,
+            "input_provenance": input_provenance,
+            "assumptions": assumptions,
+            "assumption_provenance": assumption_provenance,
+            "output": output,
+            **output
+        }
+        confidence = 0.88 if has_modelled else 0.98
+
+        display_str = (
+            f"Estimated runtime: ~{round(runtime_hours, 1)} hours "
+            f"(~{round(runtime_days, 1)} days at {ambient_temp_f}°F ambient, duty cycle ~{round(duty_cycle * 100, 1)}%) "
+            f"under stated thermodynamic assumptions."
+        )
+
+        output = {
+            "value": round(runtime_hours, 1),
+            "unit": "hours",
+            "battery_nominal_wh": battery_wh,
+            "fridge_rated_watts": fridge_rated_watts,
+            "ambient_temp_f": ambient_temp_f,
+            "estimated_duty_cycle_pct": round(duty_cycle * 100, 1),
+            "average_watts_draw": round(avg_continuous_watts, 1),
+            "daily_wh_consumption": round(daily_wh_consumption, 1),
+            "runtime_hours": round(runtime_hours, 1),
+            "runtime_days": round(runtime_days, 2),
+            "confidence": confidence,
+            "provenance_class": provenance_class,
+            "display_str": display_str
+        }
+
+        CalculationEngine._log_calculation("fridge_runtime", inputs, assumptions, output, entity_id)
+
+        return {
+            "value": round(runtime_hours, 1),
+            "unit": "hours",
+            "confidence": confidence,
+            "provenance_class": provenance_class,
             "formula_version": "v1.2-physics",
             "inputs": inputs,
             "assumptions": assumptions,

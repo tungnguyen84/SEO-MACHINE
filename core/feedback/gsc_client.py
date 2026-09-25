@@ -132,3 +132,55 @@ class GSCClient:
         dates = [r[0] for r in cursor.fetchall()]
         conn.close()
         return dates
+
+    @classmethod
+    def process_api_sync_result(
+        cls,
+        api_status_code: int,
+        response_payload: Optional[Dict[str, Any]],
+        page_url: str,
+        target_date: str,
+        workspace_id: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Processes GSC API responses and differentiates:
+        - FETCH_FAILED: HTTP 401 (OAuth expired), 429 (quota), 5xx -> keeps existing historical data intact!
+        - ZERO_DATA: valid API response where impressions == 0 and clicks == 0 (query got impressions: 0)
+        - NO_DATA: valid empty API response (e.g. query not in index or no rows returned)
+        """
+        if api_status_code in [401, 403]:
+            return {
+                "status": "FETCH_FAILED",
+                "reason": "OAuth token expired or insufficient permissions",
+                "action": "PRESERVED_HISTORICAL_DATA",
+                "rows_ingested": 0
+            }
+        elif api_status_code in [429, 500, 502, 503]:
+            return {
+                "status": "FETCH_FAILED",
+                "reason": f"API server error or rate limited (HTTP {api_status_code})",
+                "action": "PRESERVED_HISTORICAL_DATA",
+                "rows_ingested": 0
+            }
+        elif not response_payload or "rows" not in response_payload or not response_payload["rows"]:
+            return {
+                "status": "NO_DATA",
+                "reason": "Search Console API returned no rows for this query/date window",
+                "action": "RECORD_NO_DATA",
+                "rows_ingested": 0
+            }
+
+        ingested = 0
+        for r in response_payload["rows"]:
+            imp = r.get("impressions", 0)
+            clicks = r.get("clicks", 0)
+            ctr = r.get("ctr", 0.0)
+            pos = r.get("position", 0.0)
+            query = r.get("keys", [None])[0] if "keys" in r else r.get("query", "unknown")
+            cls.record_daily_metric(page_url, query, imp, clicks, ctr, pos, target_date, workspace_id=workspace_id)
+            ingested += 1
+
+        return {
+            "status": "SUCCESS" if ingested > 0 else "ZERO_DATA",
+            "rows_ingested": ingested
+        }

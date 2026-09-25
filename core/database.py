@@ -112,15 +112,22 @@ def init_db():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS jobs (
         id TEXT PRIMARY KEY,
-        workspace_id INTEGER NOT NULL,
-        task_type TEXT NOT NULL, -- 'generate_roundup', 'single_review', 'mine_reviews'
-        status TEXT DEFAULT 'queued', -- 'queued', 'running', 'completed', 'failed'
+        workspace_id INTEGER NOT NULL DEFAULT 1,
+        project_id VARCHAR(64),
+        job_type VARCHAR(64) DEFAULT 'generic',
+        task_type TEXT DEFAULT 'generic',
+        status TEXT DEFAULT 'QUEUED',
         progress INTEGER DEFAULT 0,
+        retry_count INTEGER DEFAULT 0,
+        input_summary TEXT,
+        output_summary TEXT,
         result_json TEXT,
         error_msg TEXT,
+        error TEXT,
+        started_at TIMESTAMP,
+        finished_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        completed_at TIMESTAMP,
-        FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+        completed_at TIMESTAMP
     )
     """)
 
@@ -490,6 +497,13 @@ def init_db():
         ("evidence_id", "claim_validations", "INTEGER"),
         ("source_id", "claim_validations", "INTEGER"),
         ("created_at", "evidence_claims", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+        ("project_id", "jobs", "VARCHAR(64)"),
+        ("job_type", "jobs", "VARCHAR(64) DEFAULT 'generic'"),
+        ("retry_count", "jobs", "INTEGER DEFAULT 0"),
+        ("input_summary", "jobs", "TEXT"),
+        ("output_summary", "jobs", "TEXT"),
+        ("started_at", "jobs", "TIMESTAMP"),
+        ("finished_at", "jobs", "TIMESTAMP"),
     ]
     for col, tbl, col_type in schema_patches:
         try:

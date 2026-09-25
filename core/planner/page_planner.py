@@ -179,7 +179,11 @@ class PagePlanner:
                 overlap = len(fp & efp)
                 union = len(fp | efp)
                 jaccard = overlap / union if union > 0 else 0
-                if jaccard >= 0.50 or fp.issubset(efp) or efp.issubset(fp):
+                has_f1 = any(t in fp for t in ["fridge"])
+                has_f2 = any(t in efp for t in ["fridge"])
+                if has_f1 != has_f2:
+                    continue
+                if jaccard >= 0.60 or fp == efp:
                     existing_match = orig_title
                     break
 
@@ -200,18 +204,57 @@ class PagePlanner:
                 overlap = len(fp & cluster_fp)
                 union = len(fp | cluster_fp)
                 jaccard = overlap / union if union > 0 else 0
-                # Core entity intersection check
-                core_intersection = ("outback" in fp and "outback" in cluster_fp and "fridge" in fp and "fridge" in cluster_fp)
-                if jaccard >= 0.50 or core_intersection or fp == cluster_fp:
+
+                # Specific product token differentiation
+                has_product_1 = any(t in fp for t in ["iceco", "vl45", "dometic", "ecoflow", "jackery", "anker"])
+                has_product_2 = any(t in cluster_fp for t in ["iceco", "vl45", "dometic", "ecoflow", "jackery", "anker"])
+
+                has_power_1 = any(t in fp for t in ["power", "battery", "wiring", "socket", "inverter"])
+                has_power_2 = any(t in cluster_fp for t in ["power", "battery", "wiring", "socket", "inverter"])
+
+                has_fridge_1 = any(t in fp for t in ["fridge"])
+                has_fridge_2 = any(t in cluster_fp for t in ["fridge"])
+
+                # If product specificity, power intent, or gear category differs, do NOT merge
+                if has_product_1 != has_product_2 or has_power_1 != has_power_2 or has_fridge_1 != has_fridge_2:
+                    continue
+
+                # Match if fingerprints match or high jaccard
+                if jaccard >= 0.60 or fp == cluster_fp:
                     matched_cluster_id = cid
                     break
+                elif has_product_1 and has_product_2:
+                    # Both have same specific product and vehicle
+                    prod_overlap = len(fp & cluster_fp & {"iceco", "vl45", "dometic", "ecoflow", "jackery", "anker"})
+                    veh_overlap = len(fp & cluster_fp & {"outback", "forester", "rav4", "crv", "bronco", "subaru", "toyota", "ford", "honda"})
+                    if prod_overlap > 0 and veh_overlap > 0:
+                        matched_cluster_id = cid
+                        break
+                elif not has_product_1 and not has_product_2 and not has_power_1:
+                    # Both are generic vehicle + gear roundups
+                    if ("outback" in fp and "outback" in cluster_fp and "fridge" in fp and "fridge" in cluster_fp):
+                        matched_cluster_id = cid
+                        break
 
             if matched_cluster_id is None:
                 cid = f"cluster_{len(clusters) + 1}"
+                is_pillar = any(c in fp for c in ["camp", "camping"]) and not any(g in fp for g in ["fridge", "battery", "solar", "cooler"])
+                is_power = any(t in fp for t in ["power", "battery", "wiring", "socket"])
+                
+                if is_pillar:
+                    hierarchy_type = "PILLAR_OVERVIEW"
+                elif is_power:
+                    hierarchy_type = "SECTION_WITHIN_PILLAR"
+                elif any(t in fp for t in ["iceco", "vl45", "dometic"]):
+                    hierarchy_type = "DEDICATED_FITMENT_GUIDE"
+                else:
+                    hierarchy_type = "CATEGORY_ROUNDUP"
+
                 clusters[cid] = {
                     "fingerprint": fp,
                     "primary_keyword": kw_clean,
-                    "intent": intent
+                    "intent": intent,
+                    "hierarchy_type": hierarchy_type
                 }
                 results.append({
                     "keyword": kw_clean,
@@ -219,16 +262,18 @@ class PagePlanner:
                     "cluster_id": cid,
                     "primary_keyword": kw_clean,
                     "intent": intent,
-                    "reason": "Primary pillar keyword for this topical cluster."
+                    "hierarchy_type": hierarchy_type,
+                    "reason": f"Primary pillar query for {hierarchy_type}."
                 })
             else:
                 primary_kw = clusters[matched_cluster_id]["primary_keyword"]
+                htype = clusters[matched_cluster_id]["hierarchy_type"]
                 if fp == clusters[matched_cluster_id]["fingerprint"]:
                     action = "SKIP"
                     reason = f"Exact semantic duplicate of '{primary_kw}'. Skip to avoid keyword cannibalization."
                 else:
                     action = "MERGE"
-                    reason = f"Secondary intent variant. Merge into '{primary_kw}' as sub-section or FAQ."
+                    reason = f"Secondary intent variant for {htype}. Merge into '{primary_kw}' as sub-section or FAQ."
 
                 results.append({
                     "keyword": kw_clean,
@@ -236,6 +281,7 @@ class PagePlanner:
                     "cluster_id": matched_cluster_id,
                     "primary_keyword": primary_kw,
                     "intent": intent,
+                    "hierarchy_type": htype,
                     "reason": reason
                 })
 

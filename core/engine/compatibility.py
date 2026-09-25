@@ -45,17 +45,32 @@ class CompatibilityEngine:
 
     @classmethod
     def _evaluate_vehicle_fit(cls, v: Dict, v_attrs: Dict, g: Dict, g_attrs: Dict) -> Dict[str, Any]:
-        v_h = v_attrs.get("cargo_height_inches", {}).get("num") or 32.0
-        v_w = v_attrs.get("cargo_width_inches", {}).get("num") or 40.0
-        v_l = v_attrs.get("cargo_length_inches", {}).get("num") or 38.0
+        v_h = v_attrs.get("cargo_height_inches", {}).get("num")
+        v_w = v_attrs.get("cargo_width_inches", {}).get("num")
+        v_l = v_attrs.get("cargo_length_inches", {}).get("num")
         v_amps = v_attrs.get("12v_dc_outlet_amps", {}).get("num") or 10.0
 
-        g_h = g_attrs.get("height_inches", {}).get("num") or 18.0
-        g_w = g_attrs.get("width_inches", {}).get("num") or 16.0
-        g_l = g_attrs.get("length_inches", {}).get("num") or 26.0
+        g_h = g_attrs.get("height_inches", {}).get("num") or g_attrs.get("dimensions_height_inches", {}).get("num")
+        g_w = g_attrs.get("width_inches", {}).get("num") or g_attrs.get("dimensions_width_inches", {}).get("num")
+        g_l = g_attrs.get("length_inches", {}).get("num") or g_attrs.get("dimensions_length_inches", {}).get("num")
+
+        # Zero-Evidence Rule: Refuse ungrounded fallback estimation
+        if v_h is None or g_h is None:
+            detail = f"Missing verified physical dimensions for {v.get('brand')} {v.get('model')} or {g.get('brand')} {g.get('model')}. Requires primary source documentation."
+            return {
+                "verdict": "RESEARCH_REQUIRED",
+                "compatibility_status": "UNKNOWN",
+                "confidence": 0.0,
+                "reason": detail,
+                "evidence_references": [],
+                "fit_detail": detail,
+                "max_clearance_inches": None,
+                "data_box_html": "<div class='openseo-compat-unknown'>Compatibility Unknown: Verified specs required.</div>"
+            }
 
         clearance = v_h - g_h
-        electrical_ok = (v_amps * 12.0) >= (g_attrs.get("average_power_draw_watts", {}).get("num") or 45.0)
+        watts = g_attrs.get("average_power_draw_watts", {}).get("num") or g_attrs.get("power_draw_watts", {}).get("num") or 45.0
+        electrical_ok = (v_amps * 12.0) >= watts
 
         if clearance < 0:
             status = "DOES_NOT_FIT"
@@ -111,8 +126,19 @@ class CompatibilityEngine:
 
     @classmethod
     def _evaluate_power_to_fridge(cls, p: Dict, p_attrs: Dict, f: Dict, f_attrs: Dict) -> Dict[str, Any]:
-        p_wh = p_attrs.get("battery_capacity_wh", {}).get("num") or 1000.0
-        f_watts = f_attrs.get("average_power_draw_watts", {}).get("num") or 45.0
+        p_wh = p_attrs.get("battery_capacity_wh", {}).get("num")
+        f_watts = f_attrs.get("average_power_draw_watts", {}).get("num") or f_attrs.get("power_draw_watts", {}).get("num")
+
+        if p_wh is None or f_watts is None:
+            detail = f"Missing electrical specifications for {p.get('brand')} {p.get('model')} or {f.get('brand')} {f.get('model')}. Ground-truth ingestion required."
+            return {
+                "verdict": "RESEARCH_REQUIRED",
+                "compatibility_status": "UNKNOWN",
+                "confidence": 0.0,
+                "reason": detail,
+                "fit_detail": detail,
+                "data_box_html": "<div class='openseo-compat-unknown'>Power Compatibility Unknown: Missing battery capacity or fridge draw.</div>"
+            }
 
         calc_res = CalculationEngine.calculate_fridge_runtime(battery_wh=p_wh, fridge_rated_watts=f_watts, ambient_temp_f=77.0)
 
