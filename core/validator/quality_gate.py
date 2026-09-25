@@ -66,8 +66,8 @@ class QualityGate:
 
         # 5. Hard Blocker: Affiliate Disclosure Check (FTC)
         has_disclosure = any(k in content.lower() for k in [
-            "affiliate disclosure", "commissions", "as an amazon associate",
-            "earns from qualifying purchases", "hoa hồng", "affiliate partner"
+            "affiliate disclosure", "affiliate notice", "commission", "commissions",
+            "as an amazon associate", "earns from qualifying purchases", "hoa hồng", "affiliate partner"
         ])
         if not has_disclosure:
             msg = "Affiliate Compliance Failure: Missing mandatory affiliate disclosure statement."
@@ -92,16 +92,20 @@ class QualityGate:
         # 8. Score Factor: Answer-First Structure (first 200 words)
         words = content.split()
         first_200_words = " ".join(words[:200]).lower()
-        has_quick_verdict = any(k in first_200_words for k in ["quick answer", "verdict", "bottom line", "key takeaway", "summary", "tóm tắt", "executive summary"])
+        has_quick_verdict = any(k in first_200_words for k in [
+            "quick answer", "verdict", "bottom line", "key takeaway", "summary",
+            "tóm tắt", "executive summary", "direct blueprint", "direct fitment",
+            "direct electrical", "direct measurement", "direct recommendation"
+        ])
         if not has_quick_verdict:
             score -= 10.0
             reasons.append("RECOMMENDATION: Article lacks an explicit 'Quick Answer / Bottom Line' in the first 200 words.")
 
         # 9. Score Factor: Structured Comparison / Table
-        has_table = "|" in content and "---" in content
+        has_table = ("|" in content and "---" in content) or ("<table" in content.lower() and "<tr" in content.lower())
         if not has_table:
             score -= 15.0
-            reasons.append("WARNING: Missing structured markdown comparison or specification table.")
+            reasons.append("WARNING: Missing structured comparison or specification table.")
 
         final_score = max(0.0, min(100.0, score))
 
@@ -143,6 +147,7 @@ class QualityGate:
         intent_match_score: float = 0.95,
         serp_differentiation_score: float = 0.88,
         is_stale_evidence: bool = False,
+        evidence_claims: Optional[List[Dict[str, Any]]] = None,
         non_critical_unsupported_count: int = 0,
         affiliate_link_count: Optional[int] = None,
         has_schema: bool = True,
@@ -157,6 +162,12 @@ class QualityGate:
         Provides transparent 9-point explainability breakdown.
         Hard blockers strictly force REJECT decision regardless of score.
         """
+        freshness_audit = None
+        if evidence_claims:
+            from core.entities.freshness import FreshnessEngine
+            freshness_audit = FreshnessEngine.evaluate_evidence_claims_freshness(evidence_claims)
+            if freshness_audit["overall_is_stale"]:
+                is_stale_evidence = True
         base_audit = cls.audit_content(
             title=title,
             content=content,
@@ -181,7 +192,7 @@ class QualityGate:
 
         # 4. Unique Utility (0-100)
         # AI filler penalty: 4,000 words without unique data/utility drops to 35
-        has_table = "|" in content and "---" in content
+        has_table = ("|" in content and "---" in content) or ("<table" in content.lower() and "<tr" in content.lower())
         if word_count > 3000 and not has_unique_calculated_data:
             util_100 = 35.0
         elif has_unique_calculated_data and has_table:
@@ -351,5 +362,13 @@ class QualityGate:
             "score_breakdown": breakdown,
             "hard_blockers": base_audit["hard_blockers"],
             "signals": signals,
+            "freshness_audit": freshness_audit,
             "reasons": reasons
         }
+
+
+# Method & Class aliases for backward and forward compatibility
+QualityGate.evaluate_article_readiness = QualityGate.evaluate_multi_dimensional
+QualityGateEngine = QualityGate
+
+

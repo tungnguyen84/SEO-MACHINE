@@ -472,6 +472,26 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internal_link_source ON internal_links(source_url)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internal_link_target ON internal_links(target_url)")
 
+    # 28. Bảng SERP Snapshots & Competitor Intelligence (SERP Snapshots)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS serp_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        query TEXT NOT NULL,
+        market VARCHAR(16) DEFAULT 'US',
+        language VARCHAR(16) DEFAULT 'en',
+        device VARCHAR(16) DEFAULT 'desktop',
+        volume_label VARCHAR(16) DEFAULT 'ESTIMATED', -- 'REAL', 'ESTIMATED', 'HEURISTIC', 'UNKNOWN'
+        estimated_volume INTEGER DEFAULT 0,
+        top_results_json TEXT NOT NULL, -- JSON list of rank, url, domain, title, result_type, page_type
+        serp_gap_json TEXT, -- JSON of intent_gap, exact_answer_gap, data_gap, etc.
+        opportunity_score REAL DEFAULT 0.0,
+        opportunity_breakdown_json TEXT,
+        evidence_readiness VARCHAR(32) DEFAULT 'RESEARCH_REQUIRED', -- 'READY', 'PARTIAL', 'RESEARCH_REQUIRED', 'BLOCKED'
+        retrieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_serp_query ON serp_snapshots(query)")
+
 
     # Tự động migrate thêm cột nếu bảng đã tồn tại từ trước
     schema_patches = [
@@ -504,6 +524,9 @@ def init_db():
         ("output_summary", "jobs", "TEXT"),
         ("started_at", "jobs", "TIMESTAMP"),
         ("finished_at", "jobs", "TIMESTAMP"),
+        ("freshness_policy", "attribute_definitions", "VARCHAR(32) DEFAULT 'SEMI_DYNAMIC'"),
+        ("refresh_interval_days", "attribute_definitions", "INTEGER DEFAULT 180"),
+        ("invalidate_on_source_change", "attribute_definitions", "INTEGER DEFAULT 1"),
     ]
     for col, tbl, col_type in schema_patches:
         try:

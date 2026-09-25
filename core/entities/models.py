@@ -5,6 +5,8 @@ from enum import Enum
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 
+from core.entities.freshness import FreshnessPolicy, AttributeDefinition, FreshnessEngine
+
 class EntityType(str, Enum):
     POWER_STATION = "power_station"
     PORTABLE_FRIDGE = "portable_fridge"
