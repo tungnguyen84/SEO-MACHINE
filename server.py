@@ -43,13 +43,37 @@ from claude_seo.pagespeed import PageSpeedChecker
 from openseo_core.serp_tracker import SerpRankTracker
 from openseo_core.backlink_analyzer import BacklinkAnalyzer
 from openseo_core.site_crawler import SiteCrawler
+from datetime import datetime, timezone
+
+from core.security.auth import get_authenticated_user, AuthenticatedUser, TokenManager
+from core.security.rbac import require_role, verify_tenant_access, verify_site_access
+from core.security.rate_limiter import rate_limit_endpoint, global_api_limiter
+from core.security.headers import SecurityHeadersMiddleware, SafeErrorShieldMiddleware
 
 app = FastAPI(title="OpenSEO 3-in-1 Commercial SaaS Suite")
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SafeErrorShieldMiddleware)
 
 WEB_DIR = Path(__file__).parent / "web"
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
+
+# ----------------- Health & Liveness Probes -----------------
+@app.get("/health/live")
+async def health_live():
+    return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+@app.get("/health/ready")
+async def health_ready():
+    try:
+        from core.database import get_connection
+        conn = get_connection()
+        conn.execute("SELECT 1")
+        conn.close()
+        return {"status": "ready", "database": "healthy"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database not ready: {str(e)}")
 
 # ----------------- Auth Helper -----------------
 def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
@@ -1152,8 +1176,11 @@ class SaaSMarketResearchRequest(BaseModel):
 
 
 @app.post("/api/v1/saas/sites/create")
-async def api_saas_create_site(req: SaaSSiteCreateApiRequest):
-    """Wizard Step 1 & 2: Tạo website mới kèm khởi tạo hoặc gán ngách."""
+async def api_saas_create_site(
+    req: SaaSSiteCreateApiRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Wizard Step 1 & 2: Tạo website mới kèm khởi tạo hoặc gán ngách cho tenant đã xác thực."""
     spec = None
     if req.niche_spec:
         spec = NicheSpec(**req.niche_spec)
@@ -1168,6 +1195,8 @@ async def api_saas_create_site(req: SaaSSiteCreateApiRequest):
         site_name=req.site_name,
         domain=req.domain,
         niche_id=niche_id,
+        tenant_id=user.tenant_id,
+        owner_user_id=user.user_id,
         country=req.country,
         language=req.language,
         currency=req.currency,
@@ -1178,38 +1207,59 @@ async def api_saas_create_site(req: SaaSSiteCreateApiRequest):
 
 
 @app.get("/api/v1/saas/sites")
-async def api_saas_list_sites():
-    """Lấy danh sách tất cả các website SaaS trong hệ thống."""
-    sites = SaaSSiteManager.list_sites()
+async def api_saas_list_sites(user: AuthenticatedUser = Depends(get_authenticated_user)):
+    """Lấy danh sách tất cả các website SaaS thuộc tenant của user đã xác thực."""
+    sites = SaaSSiteManager.list_sites(tenant_id=user.tenant_id)
     return {"success": True, "count": len(sites), "sites": [s.model_dump() for s in sites]}
 
 
 @app.get("/api/v1/saas/sites/{site_id}/dashboard")
-async def api_saas_site_dashboard(site_id: str):
-    """Scoped Overview Dashboard cho từng site."""
+async def api_saas_site_dashboard(
+    site_id: str,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Scoped Overview Dashboard cho từng site thuộc tenant."""
+    site = SaaSSiteManager.get_site(site_id, tenant_id=user.tenant_id)
+    if not site:
+        raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found or access denied")
     try:
-        dash = SaaSSiteManager.get_site_dashboard(site_id)
+        dash = SaaSSiteManager.get_site_dashboard(site_id, tenant_id=user.tenant_id)
         return {"success": True, "dashboard": dash}
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
 
 
 @app.get("/api/v1/saas/dashboard/global")
-async def api_saas_global_dashboard():
-    """Tổng quan toàn hệ thống đa website (Multi-Site SaaS Overview)."""
-    dash = SaaSSiteManager.get_global_dashboard()
+async def api_saas_global_dashboard(user: AuthenticatedUser = Depends(get_authenticated_user)):
+    """Tổng quan toàn hệ thống đa website cho tenant đã xác thực."""
+    dash = SaaSSiteManager.get_global_dashboard(tenant_id=user.tenant_id)
     return {"success": True, "dashboard": dash}
 
 
 @app.post("/api/v1/saas/sites/{site_id}/lifecycle")
-async def api_saas_update_lifecycle(site_id: str, req: SaaSLifecycleUpdateRequest):
-    """Cập nhật trạng thái vòng đời của website với kiểm tra phân quyền."""
+async def api_saas_update_lifecycle(
+    site_id: str,
+    req: SaaSLifecycleUpdateRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Cập nhật trạng thái vòng đời của website với kiểm tra phân quyền và tenant isolation."""
+    site = SaaSSiteManager.get_site(site_id, tenant_id=user.tenant_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site không tồn tại hoặc không thuộc quyền quản lý")
+
     try:
         target_status = SiteLifecycleStatus(req.status.upper())
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Trạng thái lifecycle không hợp lệ: {req.status}")
     try:
-        site = SaaSSiteManager.update_lifecycle_status(site_id, target_status, user_id=req.user_id or "user_admin")
+        site = SaaSSiteManager.update_lifecycle_status(
+            site_id,
+            target_status,
+            user_id=user.user_id,
+            tenant_id=user.tenant_id
+        )
         return {"success": True, "site": site.model_dump()}
     except KeyError:
         raise HTTPException(status_code=404, detail="Site không tồn tại")
@@ -1218,48 +1268,72 @@ async def api_saas_update_lifecycle(site_id: str, req: SaaSLifecycleUpdateReques
 
 
 @app.post("/api/v1/saas/sites/{site_id}/credentials")
-async def api_saas_store_credential(site_id: str, req: SaaSCredentialStoreRequest):
-    """Lưu trữ credential bảo mật mã hóa cho site."""
+async def api_saas_store_credential(
+    site_id: str,
+    req: SaaSCredentialStoreRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Lưu trữ credential bảo mật mã hóa AES-256-GCM cho site thuộc tenant."""
+    site = SaaSSiteManager.get_site(site_id, tenant_id=user.tenant_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site không tồn tại hoặc không thuộc quyền quản lý")
+
     EncryptedCredentialStore.store_credential(site_id, req.key, req.value)
     return {"success": True, "message": f"Credential '{req.key}' đã được lưu mã hóa an toàn."}
 
 
 @app.get("/api/v1/saas/sites/{site_id}/credentials")
-async def api_saas_get_credentials(site_id: str):
+async def api_saas_get_credentials(
+    site_id: str,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Lấy danh sách credentials đã được mask bảo mật (không lộ plaintext)."""
+    site = SaaSSiteManager.get_site(site_id, tenant_id=user.tenant_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site không tồn tại hoặc không thuộc quyền quản lý")
+
     creds = EncryptedCredentialStore.get_all_masked_for_site(site_id)
     return {"success": True, "credentials": {k: v.model_dump() for k, v in creds.items()}}
 
 
 @app.post("/api/v1/saas/context/switch")
-async def api_saas_switch_context(req: SaaSSwitchContextRequest):
-    """Chuyển đổi ngữ cảnh site active cho session."""
+async def api_saas_switch_context(
+    req: SaaSSwitchContextRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Chuyển đổi ngữ cảnh site active cho tenant session."""
     try:
-        SaaSSiteManager.set_active_site_context(req.user_id or "user_admin", req.site_id)
-        site = SaaSSiteManager.get_site(req.site_id)
+        SaaSSiteManager.set_active_site_context(user.user_id, req.site_id, tenant_id=user.tenant_id)
+        site = SaaSSiteManager.get_site(req.site_id, tenant_id=user.tenant_id)
         return {"success": True, "active_site": site.model_dump() if site else None}
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"Site '{req.site_id}' không tồn tại")
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=f"Site '{req.site_id}' không tồn tại hoặc truy cập bị chặn: {str(e)}")
 
 
 @app.get("/api/v1/saas/context/current")
-async def api_saas_get_current_context(user_id: Optional[str] = "user_admin"):
-    """Lấy site active hiện tại của session."""
-    site = SaaSSiteManager.get_active_site_context(user_id or "user_admin")
+async def api_saas_get_current_context(user: AuthenticatedUser = Depends(get_authenticated_user)):
+    """Lấy site active hiện tại của tenant session."""
+    site = SaaSSiteManager.get_active_site_context(user.user_id, tenant_id=user.tenant_id)
     return {"success": True, "active_site": site.model_dump() if site else None}
 
 
 # --- Niche Studio & Validation APIs ---
 
 @app.post("/api/v1/saas/niches/design-from-prompt")
-async def api_saas_design_niche_prompt(req: SaaSNichePromptRequest):
+async def api_saas_design_niche_prompt(
+    req: SaaSNichePromptRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """AI Niche Designer: Sinh NicheDraft hoàn chỉnh từ mô tả ngôn ngữ tự nhiên."""
     draft = AINicheDesigner.design_from_prompt(req.prompt)
     return {"success": True, "draft": draft.model_dump()}
 
 
 @app.post("/api/v1/saas/niches/validate")
-async def api_saas_validate_niche(req: SaaSNicheValidateRequest):
+async def api_saas_validate_niche(
+    req: SaaSNicheValidateRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Niche Validator: Kiểm tra tính toàn vẹn, dependency, công thức và độ phủ nguồn."""
     try:
         spec = NicheSpec(**req.niche_spec)
@@ -1270,7 +1344,10 @@ async def api_saas_validate_niche(req: SaaSNicheValidateRequest):
 
 
 @app.post("/api/v1/saas/niches/sandbox-test")
-async def api_saas_sandbox_test(req: SaaSNicheSandboxRequest):
+async def api_saas_sandbox_test(
+    req: SaaSNicheSandboxRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Niche Sandbox: Chạy thử nghiệm 7 bước mô phỏng pipeline thực tế."""
     try:
         spec = NicheSpec(**req.niche_spec)
@@ -1281,7 +1358,10 @@ async def api_saas_sandbox_test(req: SaaSNicheSandboxRequest):
 
 
 @app.post("/api/v1/saas/niches/critique")
-async def api_saas_critique_niche(req: SaaSNicheCritiqueRequest):
+async def api_saas_critique_niche(
+    req: SaaSNicheCritiqueRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """AI Niche Critic: Trả lời 8 câu hỏi thiết kế chiến lược của ngách."""
     try:
         spec = NicheSpec(**req.niche_spec)
@@ -1292,7 +1372,10 @@ async def api_saas_critique_niche(req: SaaSNicheCritiqueRequest):
 
 
 @app.post("/api/v1/saas/niches/data-availability")
-async def api_saas_data_availability(req: SaaSNicheCritiqueRequest):
+async def api_saas_data_availability(
+    req: SaaSNicheCritiqueRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Chấm điểm độ sẵn sàng dữ liệu (STRONG, MODERATE, WEAK)."""
     try:
         spec = NicheSpec(**req.niche_spec)
@@ -1303,7 +1386,10 @@ async def api_saas_data_availability(req: SaaSNicheCritiqueRequest):
 
 
 @app.post("/api/v1/saas/niches/market-research")
-async def api_saas_market_research(req: SaaSMarketResearchRequest):
+async def api_saas_market_research(
+    req: SaaSMarketResearchRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Ước tính tiềm năng thị trường, intent và số lượng trang khuyến nghị."""
     try:
         spec = NicheSpec(**req.niche_spec)
@@ -1314,14 +1400,17 @@ async def api_saas_market_research(req: SaaSMarketResearchRequest):
 
 
 @app.get("/api/v1/saas/niches/templates")
-async def api_saas_list_templates():
+async def api_saas_list_templates(user: AuthenticatedUser = Depends(get_authenticated_user)):
     """Lấy danh sách các template ngách sẵn có trong thư viện."""
     templates = NicheVersioningManager.list_templates()
     return {"success": True, "templates": templates}
 
 
 @app.post("/api/v1/saas/niches/export")
-async def api_saas_export_niche(req: SaaSNicheExportRequest):
+async def api_saas_export_niche(
+    req: SaaSNicheExportRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Export cấu hình ngách dạng YAML hoặc JSON đã loại bỏ secrets."""
     try:
         spec = NicheSpec(**req.niche_spec)
@@ -1335,7 +1424,10 @@ async def api_saas_export_niche(req: SaaSNicheExportRequest):
 
 
 @app.post("/api/v1/saas/niches/import")
-async def api_saas_import_niche(req: SaaSNicheImportRequest):
+async def api_saas_import_niche(
+    req: SaaSNicheImportRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
     """Import cấu hình ngách từ YAML hoặc JSON có kiểm định bảo mật."""
     try:
         if req.format.lower() == "json":

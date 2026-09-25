@@ -20,8 +20,19 @@ def get_engine():
     global _engine
     if _engine is None:
         url = settings.DATABASE_URL
-        connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-        _engine = create_engine(url, connect_args=connect_args)
+        if url.startswith("sqlite"):
+            connect_args = {"check_same_thread": False}
+            _engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+        else:
+            # Production PostgreSQL enterprise connection pool configuration
+            _engine = create_engine(
+                url,
+                pool_size=10,
+                max_overflow=20,
+                pool_timeout=30,
+                pool_recycle=1800,
+                pool_pre_ping=True
+            )
     return _engine
 
 def get_db_session() -> Session:

@@ -13,6 +13,8 @@ class DeclarativeRuleEvaluator:
     Deterministically evaluates no-code compatibility rules between two entities.
     Handles numeric tolerances, physical ranges, discrete sets, and string containment.
     """
+    MAX_CONDITIONS = 20
+    MAX_STRING_LENGTH = 1000
 
     @classmethod
     def evaluate_rule(
@@ -22,6 +24,11 @@ class DeclarativeRuleEvaluator:
         target: Dict[str, Any],
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        if len(rule.conditions) > cls.MAX_CONDITIONS:
+            raise ValueError(
+                f"Rule '{rule.name}' has {len(rule.conditions)} conditions, exceeding maximum of {cls.MAX_CONDITIONS}."
+            )
+
         ctx = context or {}
         s_attrs = ctx.get("subject_attrs", {})
         t_attrs = ctx.get("target_attrs", {})

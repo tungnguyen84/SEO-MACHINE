@@ -109,8 +109,13 @@ class SaaSSiteManager:
         return site
 
     @classmethod
-    def get_site(cls, site_id: str) -> Optional[SaaSSite]:
-        return cls._sites.get(site_id)
+    def get_site(cls, site_id: str, tenant_id: Optional[str] = None) -> Optional[SaaSSite]:
+        site = cls._sites.get(site_id)
+        if not site:
+            return None
+        if tenant_id and site.tenant_id != tenant_id:
+            return None
+        return site
 
     @classmethod
     def list_sites(cls, tenant_id: Optional[str] = None) -> List[SaaSSite]:
@@ -119,11 +124,20 @@ class SaaSSiteManager:
         return list(cls._sites.values())
 
     @classmethod
-    def update_lifecycle_status(cls, site_id: str, new_status: SiteLifecycleStatus, user_id: str = "user_admin") -> SaaSSite:
-        """Transitions site through lifecycle states with permission checks."""
-        site = cls.get_site(site_id)
+    def update_lifecycle_status(
+        cls,
+        site_id: str,
+        new_status: SiteLifecycleStatus,
+        user_id: str = "user_admin",
+        tenant_id: Optional[str] = None
+    ) -> SaaSSite:
+        """Transitions site through lifecycle states with permission checks and tenant isolation."""
+        site = cls._sites.get(site_id)
         if not site:
             raise KeyError(f"Site '{site_id}' not found.")
+
+        if tenant_id and site.tenant_id != tenant_id:
+            raise PermissionError(f"Cross-tenant access forbidden: Tenant '{tenant_id}' cannot modify site '{site_id}'.")
 
         cls.verify_permission(site_id, user_id, required_roles=[PermissionRole.OWNER, PermissionRole.ADMIN])
         site.lifecycle_status = new_status
@@ -133,33 +147,39 @@ class SaaSSiteManager:
     @classmethod
     def can_schedule_jobs(cls, site_id: str) -> bool:
         """Rule: Only ACTIVE sites may schedule or run production automation jobs."""
-        site = cls.get_site(site_id)
+        site = cls._sites.get(site_id)
         if not site:
             return False
         return site.lifecycle_status == SiteLifecycleStatus.ACTIVE
 
     @classmethod
-    def set_active_site_context(cls, user_id: str, site_id: str):
-        """Switches the active site context for the session."""
-        if site_id not in cls._sites:
+    def set_active_site_context(cls, user_id: str, site_id: str, tenant_id: Optional[str] = None):
+        """Switches the active site context for the session with tenant isolation."""
+        site = cls._sites.get(site_id)
+        if not site:
             raise KeyError(f"Cannot switch to non-existent site '{site_id}'")
+        if tenant_id and site.tenant_id != tenant_id:
+            raise PermissionError(f"Cross-tenant context switch forbidden: Tenant '{tenant_id}' cannot access site '{site_id}'.")
         cls._active_site_per_session[user_id] = site_id
 
     @classmethod
-    def get_active_site_context(cls, user_id: str) -> Optional[SaaSSite]:
+    def get_active_site_context(cls, user_id: str, tenant_id: Optional[str] = None) -> Optional[SaaSSite]:
         site_id = cls._active_site_per_session.get(user_id)
         if site_id:
-            return cls.get_site(site_id)
-        # Default to first site if any
-        if cls._sites:
-            first = next(iter(cls._sites.values()))
+            site = cls.get_site(site_id, tenant_id=tenant_id)
+            if site:
+                return site
+        # Default to first site belonging to this tenant if any
+        sites = cls.list_sites(tenant_id=tenant_id)
+        if sites:
+            first = sites[0]
             cls._active_site_per_session[user_id] = first.site_id
             return first
         return None
 
     @classmethod
     def verify_permission(cls, site_id: str, user_id: str, required_roles: List[PermissionRole]):
-        site = cls.get_site(site_id)
+        site = cls._sites.get(site_id)
         if not site:
             raise KeyError(f"Site '{site_id}' not found.")
         default_role = PermissionRole.ADMIN if user_id == "user_admin" else PermissionRole.VIEWER
@@ -168,11 +188,14 @@ class SaaSSiteManager:
             raise PermissionError(f"User '{user_id}' with role '{user_role.value}' lacks required permissions: {[r.value for r in required_roles]}")
 
     @classmethod
-    def get_site_dashboard(cls, site_id: str) -> Dict[str, Any]:
-        """Returns scoped overview dashboard for a specific site."""
-        site = cls.get_site(site_id)
+    def get_site_dashboard(cls, site_id: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
+        """Returns scoped overview dashboard for a specific site with tenant check."""
+        site = cls._sites.get(site_id)
         if not site:
             raise KeyError(f"Site '{site_id}' not found.")
+
+        if tenant_id and site.tenant_id != tenant_id:
+            raise PermissionError(f"Cross-tenant access forbidden: Site '{site_id}' does not belong to tenant '{tenant_id}'.")
 
         masked_creds = EncryptedCredentialStore.get_all_masked_for_site(site_id)
         return {
