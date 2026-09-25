@@ -1067,7 +1067,288 @@ async def api_seed_niche_defaults():
     count = adapter.seed_default_entities()
     return {"success": True, "seeded_count": count, "message": f"Đã nạp thành công {count} thực thể và thông số chuẩn xác!"}
 
+
+# ==============================================================================
+# NO-CODE SAAS SITE LIFECYCLE & NICHE STUDIO ENDPOINTS
+# ==============================================================================
+from core.niche_builder import (
+    DataType,
+    AttributeSpec,
+    RelationshipSpec,
+    CalculationSpec,
+    CompatibilityRuleSpec,
+    SourcePolicySpec,
+    PageTypeSpec,
+    ContentPolicySpec,
+    NicheSpec,
+    NicheDraft,
+    SiteLifecycleStatus,
+    PermissionRole,
+    NicheVersionSpec,
+    SafeFormulaEngine,
+    DeclarativeRuleEvaluator,
+    NicheValidator,
+    ValidationReport,
+    AINicheDesigner,
+    AINicheCritic,
+    MarketResearchEstimator,
+    DataAvailabilityScore,
+    NicheSandbox,
+    NicheVersioningManager,
+    EncryptedCredentialStore,
+    SaaSSiteManager,
+)
+
+class SaaSSiteCreateApiRequest(BaseModel):
+    site_name: str
+    domain: str
+    country: str = "US"
+    language: str = "en"
+    target_market: str = "US"
+    currency: str = "USD"
+    timezone_str: str = "America/New_York"
+    business_model: str = "Affiliate"
+    niche_option: str = "create_new"  # existing_template | create_new
+    existing_niche_id: Optional[str] = None
+    natural_language_prompt: Optional[str] = None
+    niche_spec: Optional[Dict[str, Any]] = None
+
+class SaaSLifecycleUpdateRequest(BaseModel):
+    status: str
+    user_id: Optional[str] = "user_admin"
+
+class SaaSCredentialStoreRequest(BaseModel):
+    key: str
+    value: str
+
+class SaaSSwitchContextRequest(BaseModel):
+    site_id: str
+    user_id: Optional[str] = "user_admin"
+
+class SaaSNichePromptRequest(BaseModel):
+    prompt: str
+
+class SaaSNicheValidateRequest(BaseModel):
+    niche_spec: Dict[str, Any]
+
+class SaaSNicheSandboxRequest(BaseModel):
+    niche_spec: Dict[str, Any]
+    sample_entities: Optional[List[Dict[str, Any]]] = None
+
+class SaaSNicheCritiqueRequest(BaseModel):
+    niche_spec: Dict[str, Any]
+
+class SaaSNicheExportRequest(BaseModel):
+    niche_spec: Dict[str, Any]
+    format: str = "yaml"
+
+class SaaSNicheImportRequest(BaseModel):
+    content: str
+    format: str = "yaml"
+
+class SaaSMarketResearchRequest(BaseModel):
+    niche_spec: Dict[str, Any]
+    country: Optional[str] = "US"
+
+
+@app.post("/api/v1/saas/sites/create")
+async def api_saas_create_site(req: SaaSSiteCreateApiRequest):
+    """Wizard Step 1 & 2: Tạo website mới kèm khởi tạo hoặc gán ngách."""
+    spec = None
+    if req.niche_spec:
+        spec = NicheSpec(**req.niche_spec)
+    elif req.niche_option == "existing_template" and req.existing_niche_id:
+        spec = NicheVersioningManager.get_template(req.existing_niche_id)
+    elif req.natural_language_prompt:
+        draft = AINicheDesigner.design_from_prompt(req.natural_language_prompt)
+        spec = draft.proposed_niche
+
+    niche_id = spec.niche_id if spec else (req.existing_niche_id or "generic_niche")
+    site = SaaSSiteManager.create_site(
+        site_name=req.site_name,
+        domain=req.domain,
+        niche_id=niche_id,
+        country=req.country,
+        language=req.language,
+        currency=req.currency,
+        business_model=req.business_model,
+        niche_spec=spec
+    )
+    return {"success": True, "site": site.model_dump()}
+
+
+@app.get("/api/v1/saas/sites")
+async def api_saas_list_sites():
+    """Lấy danh sách tất cả các website SaaS trong hệ thống."""
+    sites = SaaSSiteManager.list_sites()
+    return {"success": True, "count": len(sites), "sites": [s.model_dump() for s in sites]}
+
+
+@app.get("/api/v1/saas/sites/{site_id}/dashboard")
+async def api_saas_site_dashboard(site_id: str):
+    """Scoped Overview Dashboard cho từng site."""
+    try:
+        dash = SaaSSiteManager.get_site_dashboard(site_id)
+        return {"success": True, "dashboard": dash}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
+
+
+@app.get("/api/v1/saas/dashboard/global")
+async def api_saas_global_dashboard():
+    """Tổng quan toàn hệ thống đa website (Multi-Site SaaS Overview)."""
+    dash = SaaSSiteManager.get_global_dashboard()
+    return {"success": True, "dashboard": dash}
+
+
+@app.post("/api/v1/saas/sites/{site_id}/lifecycle")
+async def api_saas_update_lifecycle(site_id: str, req: SaaSLifecycleUpdateRequest):
+    """Cập nhật trạng thái vòng đời của website với kiểm tra phân quyền."""
+    try:
+        target_status = SiteLifecycleStatus(req.status.upper())
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Trạng thái lifecycle không hợp lệ: {req.status}")
+    try:
+        site = SaaSSiteManager.update_lifecycle_status(site_id, target_status, user_id=req.user_id or "user_admin")
+        return {"success": True, "site": site.model_dump()}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Site không tồn tại")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+
+
+@app.post("/api/v1/saas/sites/{site_id}/credentials")
+async def api_saas_store_credential(site_id: str, req: SaaSCredentialStoreRequest):
+    """Lưu trữ credential bảo mật mã hóa cho site."""
+    EncryptedCredentialStore.store_credential(site_id, req.key, req.value)
+    return {"success": True, "message": f"Credential '{req.key}' đã được lưu mã hóa an toàn."}
+
+
+@app.get("/api/v1/saas/sites/{site_id}/credentials")
+async def api_saas_get_credentials(site_id: str):
+    """Lấy danh sách credentials đã được mask bảo mật (không lộ plaintext)."""
+    creds = EncryptedCredentialStore.get_all_masked_for_site(site_id)
+    return {"success": True, "credentials": {k: v.model_dump() for k, v in creds.items()}}
+
+
+@app.post("/api/v1/saas/context/switch")
+async def api_saas_switch_context(req: SaaSSwitchContextRequest):
+    """Chuyển đổi ngữ cảnh site active cho session."""
+    try:
+        SaaSSiteManager.set_active_site_context(req.user_id or "user_admin", req.site_id)
+        site = SaaSSiteManager.get_site(req.site_id)
+        return {"success": True, "active_site": site.model_dump() if site else None}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Site '{req.site_id}' không tồn tại")
+
+
+@app.get("/api/v1/saas/context/current")
+async def api_saas_get_current_context(user_id: Optional[str] = "user_admin"):
+    """Lấy site active hiện tại của session."""
+    site = SaaSSiteManager.get_active_site_context(user_id or "user_admin")
+    return {"success": True, "active_site": site.model_dump() if site else None}
+
+
+# --- Niche Studio & Validation APIs ---
+
+@app.post("/api/v1/saas/niches/design-from-prompt")
+async def api_saas_design_niche_prompt(req: SaaSNichePromptRequest):
+    """AI Niche Designer: Sinh NicheDraft hoàn chỉnh từ mô tả ngôn ngữ tự nhiên."""
+    draft = AINicheDesigner.design_from_prompt(req.prompt)
+    return {"success": True, "draft": draft.model_dump()}
+
+
+@app.post("/api/v1/saas/niches/validate")
+async def api_saas_validate_niche(req: SaaSNicheValidateRequest):
+    """Niche Validator: Kiểm tra tính toàn vẹn, dependency, công thức và độ phủ nguồn."""
+    try:
+        spec = NicheSpec(**req.niche_spec)
+        report = NicheValidator.validate(spec)
+        return {"success": True, "report": report.model_dump()}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi validate schema: {str(e)}")
+
+
+@app.post("/api/v1/saas/niches/sandbox-test")
+async def api_saas_sandbox_test(req: SaaSNicheSandboxRequest):
+    """Niche Sandbox: Chạy thử nghiệm 7 bước mô phỏng pipeline thực tế."""
+    try:
+        spec = NicheSpec(**req.niche_spec)
+        report = NicheSandbox.run_dry_run(spec, req.sample_entities)
+        return {"success": True, "report": report.model_dump()}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi chạy sandbox: {str(e)}")
+
+
+@app.post("/api/v1/saas/niches/critique")
+async def api_saas_critique_niche(req: SaaSNicheCritiqueRequest):
+    """AI Niche Critic: Trả lời 8 câu hỏi thiết kế chiến lược của ngách."""
+    try:
+        spec = NicheSpec(**req.niche_spec)
+        critique = AINicheCritic.critique_niche(spec)
+        return {"success": True, "critique": critique}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi phản biện ngách: {str(e)}")
+
+
+@app.post("/api/v1/saas/niches/data-availability")
+async def api_saas_data_availability(req: SaaSNicheCritiqueRequest):
+    """Chấm điểm độ sẵn sàng dữ liệu (STRONG, MODERATE, WEAK)."""
+    try:
+        spec = NicheSpec(**req.niche_spec)
+        score = DataAvailabilityScore.score_niche(spec)
+        return {"success": True, "data_availability": score}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi tính điểm dữ liệu: {str(e)}")
+
+
+@app.post("/api/v1/saas/niches/market-research")
+async def api_saas_market_research(req: SaaSMarketResearchRequest):
+    """Ước tính tiềm năng thị trường, intent và số lượng trang khuyến nghị."""
+    try:
+        spec = NicheSpec(**req.niche_spec)
+        res = MarketResearchEstimator.estimate(spec, req.country or "US")
+        return {"success": True, "market_research": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi nghiên cứu thị trường: {str(e)}")
+
+
+@app.get("/api/v1/saas/niches/templates")
+async def api_saas_list_templates():
+    """Lấy danh sách các template ngách sẵn có trong thư viện."""
+    templates = NicheVersioningManager.list_templates()
+    return {"success": True, "templates": templates}
+
+
+@app.post("/api/v1/saas/niches/export")
+async def api_saas_export_niche(req: SaaSNicheExportRequest):
+    """Export cấu hình ngách dạng YAML hoặc JSON đã loại bỏ secrets."""
+    try:
+        spec = NicheSpec(**req.niche_spec)
+        if req.format.lower() == "json":
+            content = NicheVersioningManager.export_niche_json(spec)
+        else:
+            content = NicheVersioningManager.export_niche_yaml(spec)
+        return {"success": True, "format": req.format, "content": content}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi export ngách: {str(e)}")
+
+
+@app.post("/api/v1/saas/niches/import")
+async def api_saas_import_niche(req: SaaSNicheImportRequest):
+    """Import cấu hình ngách từ YAML hoặc JSON có kiểm định bảo mật."""
+    try:
+        if req.format.lower() == "json":
+            spec = NicheVersioningManager.import_niche_json(req.content)
+        else:
+            spec = NicheVersioningManager.import_niche_yaml(req.content)
+        return {"success": True, "niche_spec": spec.model_dump()}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi import ngách: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 Đang khởi động Full SaaS Suite tại: http://localhost:8000")
     uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)
+

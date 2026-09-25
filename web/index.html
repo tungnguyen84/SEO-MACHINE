@@ -155,6 +155,23 @@
         </div>
       </div>
 
+      <!-- Group: SaaS Multi-Site & No-Code Niche Studio -->
+      <div>
+        <div class="px-2 mb-1.5 font-semibold text-[10px] text-purple-400 uppercase tracking-wider flex items-center justify-between">
+          <span>SaaS Niche Studio</span>
+          <span class="text-[9px] bg-purple-950 text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-700">No-Code</span>
+        </div>
+        <div class="space-y-1">
+          <button onclick="switchTab('saas-niche-studio')" id="nav-saas-niche-studio" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-medium transition text-purple-300 hover:bg-slate-800 hover:text-white bg-purple-950/30 border border-purple-500/30">
+            <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i> Xưởng Ngách & AI Designer
+          </button>
+          <button onclick="switchTab('saas-sites')" id="nav-saas-sites" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-medium transition text-indigo-300 hover:bg-slate-800 hover:text-white bg-indigo-950/30 border border-indigo-500/30">
+            <i data-lucide="globe-2" class="w-4 h-4 text-indigo-400"></i> Quản Trị Đa Site & Lifecycle
+          </button>
+        </div>
+      </div>
+
+
       <!-- Group: Settings -->
       <div>
         <div class="px-2 mb-1.5 font-semibold text-[10px] text-slate-500 uppercase tracking-wider">Cấu Hình</div>
@@ -2015,8 +2032,307 @@
         </div>
       </section>
 
+      <!-- ========================================== -->
+      <!-- TAB: SAAS NO-CODE NICHE STUDIO             -->
+      <!-- ========================================== -->
+      <section id="tab-saas-niche-studio" class="hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 p-6 rounded-2xl border border-purple-800/60 shadow-lg text-white">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500 text-white">100% No-Code</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white">Data Authority</span>
+                <h3 class="text-base font-black uppercase tracking-wider text-purple-200">Xưởng Thiết Kế Ngách & Studio No-Code AI</h3>
+              </div>
+              <p class="text-xs text-slate-300 max-w-2xl">
+                Khởi tạo và vận hành website dữ liệu có thẩm quyền cao trong bất kỳ ngành hàng nào mà không cần lập trình viên. Thiết kế thực thể, thông số, công thức toán học và quy tắc tương thích 100% từ giao diện.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="exportCurrentNiche('yaml')" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-white/20">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> Xuất YAML
+              </button>
+              <button onclick="exportCurrentNiche('json')" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-white/20">
+                <i data-lucide="file-json" class="w-3.5 h-3.5"></i> Xuất JSON
+              </button>
+              <button onclick="openNicheImportModal()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-md">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Nhập Cấu Hình
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Site Creation & Niche Selection Wizard -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Wizard Form (5 Cols) -->
+          <div class="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-black flex items-center justify-center">1</span>
+                Wizard Khởi Tạo Website Mới
+              </h4>
+              <span class="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded">Bước 1 & 2</span>
+            </div>
+
+            <!-- Basic Info -->
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Tên Website / Thương Hiệu</label>
+                <input id="wizard-site-name" type="text" placeholder="Ví dụ: Clean Air Authority" value="Clean Air Authority" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Tên Miền (Domain)</label>
+                  <input id="wizard-site-domain" type="text" placeholder="cleanairauthority.com" value="cleanairauthority.com" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Mô Hình Kinh Doanh</label>
+                  <select id="wizard-business-model" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                    <option value="Affiliate">Tiếp thị liên kết (Affiliate)</option>
+                    <option value="Ecommerce">Thương mại điện tử</option>
+                    <option value="LeadGeneration">Thu thập khách hàng (Leads)</option>
+                    <option value="DisplayAds">Quảng cáo hiển thị</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Quốc Gia</label>
+                  <input id="wizard-country" type="text" value="US" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg text-center font-bold">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Ngôn Ngữ</label>
+                  <input id="wizard-language" type="text" value="en" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg text-center font-bold">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Tiền Tệ</label>
+                  <input id="wizard-currency" type="text" value="USD" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg text-center font-bold">
+                </div>
+              </div>
+            </div>
+
+            <!-- Niche Selection Mode -->
+            <div class="pt-3 border-t border-slate-100 space-y-3">
+              <label class="block text-xs font-bold text-slate-900">Cách Thức Định Nghĩa Ngách</label>
+              
+              <!-- Tab Choice -->
+              <div class="flex rounded-lg bg-slate-100 p-1 text-xs">
+                <button onclick="setNicheWizardMode('ai')" id="wizard-mode-ai-btn" class="flex-1 py-1.5 font-bold rounded-md bg-white text-purple-700 shadow-xs transition">Thiết Kế Bằng AI</button>
+                <button onclick="setNicheWizardMode('template')" id="wizard-mode-template-btn" class="flex-1 py-1.5 font-bold rounded-md text-slate-500 hover:text-slate-800 transition">Thư Viện Template</button>
+              </div>
+
+              <!-- AI Prompt Form -->
+              <div id="wizard-ai-container" class="space-y-2">
+                <label class="block text-[11px] text-slate-600 font-medium">Mô tả ý tưởng ngách của bạn bằng ngôn ngữ tự nhiên:</label>
+                <textarea id="wizard-ai-prompt" rows="4" class="w-full text-xs p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Ví dụ: Máy lọc không khí và màng lọc HEPA, tính diện tích phòng CADR, công suất điện hàng năm và tương thích khay màng lọc..."></textarea>
+                <button onclick="generateNicheFromPrompt()" id="btn-generate-ai-niche" class="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+                  <i data-lucide="sparkles" class="w-4 h-4"></i> AI Thiết Kế Ngách (Generate NicheDraft)
+                </button>
+              </div>
+
+              <!-- Template Library Form -->
+              <div id="wizard-template-container" class="hidden space-y-2">
+                <label class="block text-[11px] text-slate-600 font-medium">Chọn ngách đã được chuẩn hóa trong kho tri thức:</label>
+                <select id="wizard-template-select" class="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                  <option value="air_purifiers">💨 Máy Lọc Không Khí & Màng Lọc (Air Purifiers)</option>
+                  <option value="dog_crates">🐕 Chuồng Chó & Khoang Xe SUV (Dog Crates & Kennels)</option>
+                  <option value="vehicle_camping">🏕️ Xe Dã Ngoại & Cắm Trại (Vehicle Camping)</option>
+                  <option value="coffee_equipment">☕ Thiết Bị Pha Cà Phê Espresso (Coffee Equipment)</option>
+                  <option value="workshop_tools">🔧 Dụng Cụ Xưởng & Máy Móc (Workshop Tools)</option>
+                  <option value="home_solar">☀️ Điện Mặt Trời Hộ Gia Đình (Home Solar)</option>
+                </select>
+                <button onclick="loadSelectedTemplate()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+                  <i data-lucide="copy" class="w-4 h-4"></i> Nạp Cấu Hình Template
+                </button>
+              </div>
+            </div>
+
+            <!-- Create Site Action -->
+            <div class="pt-3 border-t border-slate-100">
+              <button onclick="submitCreateSaaSSite()" id="btn-submit-create-site" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i> Tạo Website Mới Trong Hệ Thống
+              </button>
+            </div>
+          </div>
+
+          <!-- Niche Architecture Workspace (7 Cols) -->
+          <div class="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <h4 class="font-bold text-slate-900 text-sm">Cấu Trúc Mô Hình Ngách (Active Niche Spec)</h4>
+                <span id="current-niche-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">air_purifiers v1.0.0</span>
+              </div>
+              <span id="current-niche-risk" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">LOW RISK</span>
+            </div>
+
+            <!-- Architecture Subtabs -->
+            <div class="flex border-b border-slate-200 text-xs overflow-x-auto space-x-4">
+              <button onclick="switchStudioSubtab('entities')" id="subtab-studio-entities" class="subtab-active pb-2 font-bold whitespace-nowrap">Thực Thể & Specs</button>
+              <button onclick="switchStudioSubtab('formulas')" id="subtab-studio-formulas" class="text-slate-500 pb-2 hover:text-slate-800 whitespace-nowrap">Công Thức Toán</button>
+              <button onclick="switchStudioSubtab('rules')" id="subtab-studio-rules" class="text-slate-500 pb-2 hover:text-slate-800 whitespace-nowrap">Quy Tắc Tương Thích</button>
+              <button onclick="switchStudioSubtab('sources')" id="subtab-studio-sources" class="text-slate-500 pb-2 hover:text-slate-800 whitespace-nowrap">Nguồn Dữ Liệu</button>
+              <button onclick="switchStudioSubtab('pages')" id="subtab-studio-pages" class="text-slate-500 pb-2 hover:text-slate-800 whitespace-nowrap">Archetype Trang</button>
+            </div>
+
+            <!-- Subtab Content Panels -->
+            <div id="studio-panel-entities" class="space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700">Danh Sách Thực Thể Được Khai Báo:</span>
+                <span id="count-entities-badge" class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full">4 thực thể</span>
+              </div>
+              <div id="studio-entities-chips" class="flex flex-wrap gap-1.5">
+                <!-- Dynamic Chips -->
+              </div>
+              <div class="border border-slate-100 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 border-b border-slate-100 text-[10px] uppercase text-slate-400 font-bold">
+                    <tr>
+                      <th class="py-2 px-3">Thực thể</th>
+                      <th class="py-2 px-3">Thuộc tính</th>
+                      <th class="py-2 px-3">Kiểu dữ liệu</th>
+                      <th class="py-2 px-3">Đơn vị</th>
+                      <th class="py-2 px-3">Critical</th>
+                    </tr>
+                  </thead>
+                  <tbody id="studio-attributes-tbody" class="divide-y divide-slate-100 font-mono text-[11px]">
+                    <!-- Dynamic Rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="studio-panel-formulas" class="hidden space-y-3">
+              <span class="text-xs font-bold text-slate-700">Công Thức Vật Lý & Kinh Tế (Safe AST Parsed):</span>
+              <div id="studio-formulas-list" class="space-y-2 max-h-64 overflow-y-auto">
+                <!-- Dynamic Formulas -->
+              </div>
+            </div>
+
+            <div id="studio-panel-rules" class="hidden space-y-3">
+              <span class="text-xs font-bold text-slate-700">Quy Tắc Đánh Giá Tương Thích & Lắp Đặt:</span>
+              <div id="studio-rules-list" class="space-y-2 max-h-64 overflow-y-auto">
+                <!-- Dynamic Rules -->
+              </div>
+            </div>
+
+            <div id="studio-panel-sources" class="hidden space-y-3">
+              <span class="text-xs font-bold text-slate-700">Chính Sách Thứ Bậc Nguồn & Thời Gian Hết Hạn:</span>
+              <div id="studio-sources-list" class="space-y-2 max-h-64 overflow-y-auto">
+                <!-- Dynamic Sources -->
+              </div>
+            </div>
+
+            <div id="studio-panel-pages" class="hidden space-y-3">
+              <span class="text-xs font-bold text-slate-700">Các Dạng Bài Viết Chuẩn Hóa Theo Search Intent:</span>
+              <div id="studio-pages-list" class="space-y-2 max-h-64 overflow-y-auto">
+                <!-- Dynamic Pages -->
+              </div>
+            </div>
+
+            <!-- Testing & Inspection Control Bar -->
+            <div class="pt-4 border-t border-slate-100 flex flex-wrap gap-2">
+              <button onclick="runNicheValidation()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg transition flex items-center gap-1.5 border border-indigo-200">
+                <i data-lucide="check-check" class="w-3.5 h-3.5"></i> 1. Kiểm Định Validator
+              </button>
+              <button onclick="runNicheSandboxTest()" id="btn-sandbox-test" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-lg transition flex items-center gap-1.5 border border-emerald-200">
+                <i data-lucide="play-circle" class="w-3.5 h-3.5"></i> 2. Chạy Thử Sandbox (7 Bước)
+              </button>
+              <button onclick="runAiCriticReview()" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-lg transition flex items-center gap-1.5 border border-amber-200">
+                <i data-lucide="help-circle" class="w-3.5 h-3.5"></i> 3. AI Phản Biện (8 Câu Hỏi)
+              </button>
+              <button onclick="runDataAvailabilityCheck()" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs rounded-lg transition flex items-center gap-1.5 border border-sky-200">
+                <i data-lucide="database" class="w-3.5 h-3.5"></i> 4. Độ Sẵn Sàng Dữ Liệu
+              </button>
+              <button onclick="activateCurrentProject()" class="ml-auto px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-lg transition shadow-md flex items-center gap-1.5">
+                <i data-lucide="rocket" class="w-3.5 h-3.5"></i> Kích Hoạt Dự Án (Activate Site)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inspection Results Log Panel -->
+        <div id="studio-results-container" class="hidden bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <h4 id="studio-results-title" class="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <i data-lucide="terminal" class="w-4 h-4 text-purple-600"></i> Kết Quả Chạy Thử Nghiệm Sandbox
+            </h4>
+            <span id="studio-results-status" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">PASS (100%)</span>
+          </div>
+          <div id="studio-results-content" class="text-xs space-y-2">
+            <!-- Dynamic Inspection Logs -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB: SAAS MULTI-SITE & LIFECYCLE HUB       -->
+      <!-- ========================================== -->
+      <section id="tab-saas-sites" class="hidden space-y-6">
+        <!-- Global KPI Metrics Header -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng Số Site</span>
+            <div id="saas-stat-total-sites" class="text-xl font-black text-slate-900 mt-1">1</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thực Thể Verified</span>
+            <div id="saas-stat-total-entities" class="text-xl font-black text-emerald-600 mt-1">0</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kế Hoạch Trang</span>
+            <div id="saas-stat-total-plans" class="text-xl font-black text-sky-600 mt-1">0</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bài Viết Nháp</span>
+            <div id="saas-stat-total-drafts" class="text-xl font-black text-indigo-600 mt-1">0</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">GSC Impressions</span>
+            <div id="saas-stat-gsc-impressions" class="text-xl font-black text-purple-600 mt-1">0</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Click Affiliate</span>
+            <div id="saas-stat-affiliate-clicks" class="text-xl font-black text-amber-600 mt-1">0</div>
+          </div>
+        </div>
+
+        <!-- Multi-Site Table -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm">Danh Sách Website Đang Quản Trị (Multi-Tenant Sites)</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Mỗi website vận hành độc lập theo ngách dữ liệu riêng, cô lập bảo mật tuyệt đối.</p>
+            </div>
+            <button onclick="switchTab('saas-niche-studio')" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tạo Website Mới
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b border-slate-100 text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+                <tr>
+                  <th class="py-3 px-4">Tên Site & Domain</th>
+                  <th class="py-3 px-4">Ngách Dữ Liệu</th>
+                  <th class="py-3 px-4">Vòng Đời (Lifecycle)</th>
+                  <th class="py-3 px-4">Automation Jobs</th>
+                  <th class="py-3 px-4">Thực Thể</th>
+                  <th class="py-3 px-4">Nháp</th>
+                  <th class="py-3 px-4">Đã Đăng</th>
+                  <th class="py-3 px-4 text-right">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody id="saas-sites-tbody" class="divide-y divide-slate-100 font-medium">
+                <!-- Dynamic Rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
     </div>
   </main>
+
 
   <script>
     lucide.createIcons();
@@ -2064,6 +2380,8 @@
         'campaign': 'Khai Thác Ngách Kim Cương & Lịch 30 Ngày Tự Động (Autopilot)',
         'repository': 'Kho Từ Khóa & Quản Lý Bài Viết Đã Đăng (Content & Keyword Hub)',
         'videocreator': 'Xưởng Sản Xuất Video Short AI (Reels, TikTok, Shorts)',
+        'saas-niche-studio': 'Xưởng Thiết Kế Ngách & Studio No-Code AI (Niche Studio)',
+        'saas-sites': 'Quản Trị Đa Website SaaS & Lifecycle Engine (Multi-Tenant Hub)',
         'settings': 'Cài Đặt & Cấu Hình Hệ Thống'
       };
       document.getElementById('header-title').innerText = titles[tabId] || '';
@@ -2083,9 +2401,532 @@
       if (tabId === 'repository') loadKeywordRepository();
       if (tabId === 'videocreator') loadVideoVoices();
       if (tabId === 'cloaker') loadCloakedLinks();
+      if (tabId === 'saas-niche-studio') loadActiveNicheStudio();
+      if (tabId === 'saas-sites') loadSaaSSites();
       if (tabId === 'jobs') {
         loadBackgroundJobs();
         jobsInterval = setInterval(loadBackgroundJobs, 3500);
+      }
+    }
+
+    // ----------------- SaaS No-Code Niche Studio & Multi-Site JS -----------------
+    let activeNicheSpec = null;
+    let activeStudioSubtab = 'entities';
+
+    function setNicheWizardMode(mode) {
+      const isAi = mode === 'ai';
+      document.getElementById('wizard-mode-ai-btn').className = isAi 
+        ? 'flex-1 py-1.5 font-bold rounded-md bg-white text-purple-700 shadow-xs transition'
+        : 'flex-1 py-1.5 font-bold rounded-md text-slate-500 hover:text-slate-800 transition';
+      document.getElementById('wizard-mode-template-btn').className = !isAi 
+        ? 'flex-1 py-1.5 font-bold rounded-md bg-white text-purple-700 shadow-xs transition'
+        : 'flex-1 py-1.5 font-bold rounded-md text-slate-500 hover:text-slate-800 transition';
+      document.getElementById('wizard-ai-container').classList.toggle('hidden', !isAi);
+      document.getElementById('wizard-template-container').classList.toggle('hidden', isAi);
+    }
+
+    async function loadActiveNicheStudio() {
+      if (!activeNicheSpec) {
+        await loadSelectedTemplate('air_purifiers');
+      }
+    }
+
+    async function generateNicheFromPrompt() {
+      const prompt = document.getElementById('wizard-ai-prompt').value.trim();
+      if (!prompt) return alert('Vui lòng nhập ý tưởng hoặc mô tả ngành hàng ngách!');
+      const btn = document.getElementById('btn-generate-ai-niche');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> AI đang thiết kế mô hình...`;
+
+      try {
+        const res = await fetch('/api/v1/saas/niches/design-from-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        if (data.success && data.draft) {
+          activeNicheSpec = data.draft.proposed_niche;
+          renderNicheArchitecture(activeNicheSpec);
+          showStudioLog('AI Designer', `Đã sinh thành công NicheDraft '${activeNicheSpec.niche_name}' (${activeNicheSpec.niche_id}) từ prompt!`, true);
+        } else {
+          alert('Lỗi: ' + (data.detail || 'Không thể sinh ngách'));
+        }
+      } catch (e) {
+        alert('Lỗi kết nối AI Designer: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> AI Thiết Kế Ngách (Generate NicheDraft)`;
+        lucide.createIcons();
+      }
+    }
+
+    async function loadSelectedTemplate(explicitId) {
+      const tId = explicitId || document.getElementById('wizard-template-select').value;
+      try {
+        const res = await fetch('/api/v1/saas/niches/templates');
+        const data = await res.json();
+        const draftRes = await fetch('/api/v1/saas/niches/design-from-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: tId })
+        });
+        const draftData = await draftRes.json();
+        if (draftData.success && draftData.draft) {
+          activeNicheSpec = draftData.draft.proposed_niche;
+          renderNicheArchitecture(activeNicheSpec);
+          showStudioLog('Template Library', `Đã nạp template chuẩn hóa: ${activeNicheSpec.niche_name} (${activeNicheSpec.version})`, true);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderNicheArchitecture(spec) {
+      if (!spec) return;
+      document.getElementById('current-niche-badge').innerText = `${spec.niche_id} v${spec.version}`;
+      document.getElementById('current-niche-risk').innerText = `${spec.risk_profile || 'LOW'} RISK`;
+      document.getElementById('count-entities-badge').innerText = `${spec.entity_types.length} thực thể`;
+
+      const chipsBox = document.getElementById('studio-entities-chips');
+      chipsBox.innerHTML = '';
+      spec.entity_types.forEach(et => {
+        chipsBox.innerHTML += `<span class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold text-xs border border-purple-200">📦 ${et}</span>`;
+      });
+
+      const attrTbody = document.getElementById('studio-attributes-tbody');
+      attrTbody.innerHTML = '';
+      for (const [et, attrs] of Object.entries(spec.attributes || {})) {
+        attrs.forEach(a => {
+          attrTbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+              <td class="py-1.5 px-3 font-bold text-slate-800">${et}</td>
+              <td class="py-1.5 px-3 text-indigo-600 font-bold">${a.key}</td>
+              <td class="py-1.5 px-3 text-slate-500">${a.data_type}</td>
+              <td class="py-1.5 px-3 font-semibold text-purple-600">${a.unit || '-'}</td>
+              <td class="py-1.5 px-3">${a.critical ? '<span class="text-rose-600 font-bold">YES</span>' : '<span class="text-slate-400">no</span>'}</td>
+            </tr>
+          `;
+        });
+      }
+
+      const fList = document.getElementById('studio-formulas-list');
+      fList.innerHTML = '';
+      (spec.calculations || []).forEach(c => {
+        fList.innerHTML += `
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs">
+            <div class="font-bold text-slate-800 text-[11px] font-sans mb-1 flex items-center justify-between">
+              <span>${c.name} (<code>${c.id}</code>)</span>
+              <span class="text-purple-600 font-bold font-mono">${c.output_unit || 'dimensionless'}</span>
+            </div>
+            <div class="p-2 bg-slate-900 text-emerald-400 rounded-lg text-[11px] overflow-x-auto">${c.formula}</div>
+          </div>
+        `;
+      });
+
+      const rList = document.getElementById('studio-rules-list');
+      rList.innerHTML = '';
+      (spec.compatibility_rules || []).forEach(r => {
+        const conds = (r.conditions || []).map(cd => `${cd.subject_attribute} ${cd.operator} ${cd.target_attribute || cd.constant_value} (tol: ${cd.tolerance})`).join(' AND ');
+        rList.innerHTML += `
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+            <div class="font-bold text-slate-800 text-xs flex items-center justify-between mb-1">
+              <span>⚖️ ${r.name} (${r.subject_type} ↔ ${r.target_type})</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.pass_status}</span>
+            </div>
+            <div class="font-mono text-[11px] text-indigo-700 bg-white p-2 rounded border border-slate-200">${conds}</div>
+          </div>
+        `;
+      });
+
+      const sList = document.getElementById('studio-sources-list');
+      sList.innerHTML = '';
+      (spec.source_policies || []).forEach(sp => {
+        sList.innerHTML += `
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+            <div class="font-bold text-slate-800">🏛️ ${sp.source_type}</div>
+            <div class="flex items-center gap-3 text-slate-500 text-[11px]">
+              <span>Ưu tiên: <strong class="text-purple-600">Priority ${sp.priority}</strong></span>
+              <span>TTL: <strong>${sp.freshness_interval_days} ngày</strong></span>
+            </div>
+          </div>
+        `;
+      });
+
+      const pList = document.getElementById('studio-pages-list');
+      pList.innerHTML = '';
+      (spec.page_types || []).forEach(pt => {
+        pList.innerHTML += `
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-800">📄 ${pt.name}</div>
+              <div class="text-[10px] text-slate-400">ID: <code>${pt.page_type_id}</code> | Thực thể: ${(pt.required_entities || []).join(', ')}</div>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${pt.primary_intent}</span>
+          </div>
+        `;
+      });
+
+      lucide.createIcons();
+    }
+
+    function switchStudioSubtab(sub) {
+      activeStudioSubtab = sub;
+      ['entities', 'formulas', 'rules', 'sources', 'pages'].forEach(s => {
+        const btn = document.getElementById('subtab-studio-' + s);
+        const panel = document.getElementById('studio-panel-' + s);
+        if (btn) btn.className = s === sub ? 'subtab-active pb-2 font-bold whitespace-nowrap' : 'text-slate-500 pb-2 hover:text-slate-800 whitespace-nowrap';
+        if (panel) panel.classList.toggle('hidden', s !== sub);
+      });
+      lucide.createIcons();
+    }
+
+    function showStudioLog(title, contentHtml, isSuccess) {
+      const box = document.getElementById('studio-results-container');
+      box.classList.remove('hidden');
+      document.getElementById('studio-results-title').innerHTML = `<i data-lucide="terminal" class="w-4 h-4 text-purple-600"></i> ${title}`;
+      const statusBadge = document.getElementById('studio-results-status');
+      statusBadge.innerText = isSuccess ? 'THÀNH CÔNG (PASS)' : 'CẦN CHÚ Ý (WARNING/FAIL)';
+      statusBadge.className = isSuccess 
+        ? 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200'
+        : 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200';
+      document.getElementById('studio-results-content').innerHTML = contentHtml;
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      lucide.createIcons();
+    }
+
+    async function runNicheValidation() {
+      if (!activeNicheSpec) return alert('Chưa nạp mô hình ngách!');
+      try {
+        const res = await fetch('/api/v1/saas/niches/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ niche_spec: activeNicheSpec })
+        });
+        const data = await res.json();
+        const rep = data.report;
+        let html = `<div class="p-3 rounded-lg ${rep.is_valid ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' : 'bg-rose-50 text-rose-900 border border-rose-200'}">
+          <strong>Trạng thái:</strong> ${rep.is_valid ? '✔ Hoàn toàn hợp lệ (Valid Spec)' : '✖ Phát hiện lỗi cấu trúc'}<br/>
+          <strong>Lỗi nghiêm trọng:</strong> ${rep.errors_count} | <strong>Cảnh báo:</strong> ${rep.warnings_count}
+        </div>`;
+        if (rep.issues && rep.issues.length > 0) {
+          html += `<ul class="space-y-1.5 mt-2">` + rep.issues.map(i => `
+            <li class="p-2 rounded bg-slate-50 border border-slate-200 text-xs">
+              <span class="font-bold ${i.severity === 'ERROR' ? 'text-rose-600' : 'text-amber-600'}">[${i.severity}]</span>
+              <strong>${i.category} (${i.target}):</strong> ${i.message}
+              ${i.recommendation ? `<div class="text-slate-500 text-[10px] mt-0.5">Khuyến nghị: ${i.recommendation}</div>` : ''}
+            </li>
+          `).join('') + `</ul>`;
+        }
+        showStudioLog('Kiểm Định Tính Hợp Lệ Của Ngách (Niche Validator)', html, rep.is_valid);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function runNicheSandboxTest() {
+      if (!activeNicheSpec) return alert('Chưa nạp mô hình ngách!');
+      const btn = document.getElementById('btn-sandbox-test');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Đang chạy 7 bước...`;
+
+      try {
+        const res = await fetch('/api/v1/saas/niches/sandbox-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ niche_spec: activeNicheSpec })
+        });
+        const data = await res.json();
+        const rep = data.report;
+        let html = `<div class="space-y-2">
+          <div class="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+            <div>
+              <div class="font-bold text-sm">Sandbox Verdict: <span class="${rep.overall_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'}">${rep.overall_status}</span></div>
+              <div class="text-[11px] text-slate-300">Điểm Quality Gate: ${rep.quality_score}/100 | Thực thể test: ${rep.test_entities_count}</div>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg text-xs font-black ${rep.can_activate ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}">
+              ${rep.can_activate ? 'SẴN SÀNG KÍCH HOẠT' : 'CHƯA ĐẠT CHUẨN'}
+            </span>
+          </div>
+          <div class="space-y-1.5">
+            ${(rep.stages || []).map(st => `
+              <div class="p-2.5 rounded-lg border ${st.status === 'PASS' ? 'border-emerald-200 bg-emerald-50/50' : (st.status === 'WARNING' ? 'border-amber-200 bg-amber-50/50' : 'border-rose-200 bg-rose-50/50')} flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-bold text-slate-800">${st.stage_name}</div>
+                  <div class="text-[11px] text-slate-500">${st.message}</div>
+                </div>
+                <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded ${st.status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${st.status} (${st.execution_time_ms}ms)</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+        showStudioLog('Mô Phỏng Sandbox Dry-Run Toàn Diện (7 Giai Đoạn)', html, rep.overall_status === 'PASS');
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="play-circle" class="w-3.5 h-3.5"></i> 2. Chạy Thử Sandbox (7 Bước)`;
+        lucide.createIcons();
+      }
+    }
+
+    async function runAiCriticReview() {
+      if (!activeNicheSpec) return alert('Chưa nạp mô hình ngách!');
+      try {
+        const res = await fetch('/api/v1/saas/niches/critique', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ niche_spec: activeNicheSpec })
+        });
+        const data = await res.json();
+        const c = data.critique;
+        let html = `<div class="space-y-2">
+          <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 flex justify-between items-center text-xs">
+            <span class="font-bold text-purple-900">Đánh giá chung: <strong>${c.overall_health || 'SOLID'}</strong> (${c.total_questions} câu hỏi)</span>
+            <span class="px-2 py-0.5 rounded font-black ${c.verdict === 'APPROVE' ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}">${c.verdict}</span>
+          </div>
+          <div class="space-y-1.5">
+            ${(c.answers || []).map((ans, idx) => `
+              <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                <div class="font-bold text-slate-900 flex items-center justify-between">
+                  <span>${idx + 1}. ${ans.question}</span>
+                  <span class="text-[10px] font-bold ${ans.assessment === 'SATISFACTORY' ? 'text-emerald-600' : 'text-amber-600'}">${ans.assessment}</span>
+                </div>
+                <div class="text-[11px] text-slate-600 mt-1">${ans.details}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+        showStudioLog('AI Critic Phản Biện Chiến Lược (8 Câu Hỏi)', html, c.verdict === 'APPROVE');
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function runDataAvailabilityCheck() {
+      if (!activeNicheSpec) return alert('Chưa nạp mô hình ngách!');
+      try {
+        const res = await fetch('/api/v1/saas/niches/data-availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ niche_spec: activeNicheSpec })
+        });
+        const data = await res.json();
+        const d = data.data_availability;
+        let html = `<div class="space-y-2 text-xs">
+          <div class="p-3 rounded-xl bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <div class="font-bold text-sm">Điểm sẵn sàng dữ liệu: <strong class="text-sky-400">${d.numerical_score}/100 (${d.score})</strong></div>
+              <div class="text-[11px] text-slate-300">Khả năng kích hoạt: ${d.can_activate ? 'ĐẠT TIÊU CHUẨN' : 'KHÔNG ĐỦ DỮ LIỆU'}</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            ${Object.entries(d.dimensions || {}).map(([dim, score]) => `
+              <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                <div class="font-bold text-slate-700 truncate">${dim.replace(/_/g, ' ')}</div>
+                <div class="font-black text-sky-600 text-sm mt-0.5">${score}/100</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+        showStudioLog('Đo Lường Độ Sẵn Sàng Dữ Liệu (Data Availability)', html, d.can_activate);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function submitCreateSaaSSite() {
+      const name = document.getElementById('wizard-site-name').value.trim();
+      const domain = document.getElementById('wizard-site-domain').value.trim();
+      const model = document.getElementById('wizard-business-model').value;
+      const country = document.getElementById('wizard-country').value.trim();
+      const lang = document.getElementById('wizard-language').value.trim();
+      const curr = document.getElementById('wizard-currency').value.trim();
+      if (!name || !domain) return alert('Vui lòng nhập Tên Site và Domain!');
+
+      const btn = document.getElementById('btn-submit-create-site');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Đang khởi tạo...`;
+
+      try {
+        const res = await fetch('/api/v1/saas/sites/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            site_name: name,
+            domain: domain,
+            business_model: model,
+            country: country,
+            language: lang,
+            currency: curr,
+            niche_spec: activeNicheSpec
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.site) {
+          alert(`🎉 Đã khởi tạo thành công website '${data.site.site_name}'!`);
+          switchTab('saas-sites');
+        }
+      } catch (e) {
+        alert('Lỗi tạo site: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="plus-circle" class="w-4 h-4"></i> Tạo Website Mới Trong Hệ Thống`;
+        lucide.createIcons();
+      }
+    }
+
+    async function activateCurrentProject() {
+      const domain = document.getElementById('wizard-site-domain').value.trim();
+      const siteId = `site_${domain.replace(/[\.-]/g, '_').toLowerCase()}`;
+      try {
+        const res = await fetch(`/api/v1/saas/sites/${siteId}/lifecycle`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ACTIVE' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`🚀 Website '${domain}' đã được KÍCH HOẠT (ACTIVE) thành công! Các tác vụ automation ngầm đã được cấp phép chạy.`);
+          switchTab('saas-sites');
+        } else {
+          alert('Không thể kích hoạt: ' + (data.detail || 'Lỗi không xác định'));
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function exportCurrentNiche(format) {
+      if (!activeNicheSpec) return alert('Chưa nạp mô hình ngách!');
+      try {
+        const res = await fetch('/api/v1/saas/niches/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ niche_spec: activeNicheSpec, format: format })
+        });
+        const data = await res.json();
+        const blob = new Blob([data.content], { type: format === 'json' ? 'application/json' : 'text/yaml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${activeNicheSpec.niche_id}_spec.${format}`;
+        a.click();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    function openNicheImportModal() {
+      const raw = prompt('Dán nội dung cấu hình YAML hoặc JSON của ngách vào đây:');
+      if (!raw) return;
+      importNicheContent(raw);
+    }
+
+    async function importNicheContent(content) {
+      try {
+        const isJson = content.trim().startsWith('{');
+        const res = await fetch('/api/v1/saas/niches/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: content, format: isJson ? 'json' : 'yaml' })
+        });
+        const data = await res.json();
+        if (data.success && data.niche_spec) {
+          activeNicheSpec = data.niche_spec;
+          renderNicheArchitecture(activeNicheSpec);
+          alert(`Đã nạp thành công ngách: ${activeNicheSpec.niche_name}!`);
+        } else {
+          alert('Lỗi import: ' + (data.detail || 'Nội dung không hợp lệ'));
+        }
+      } catch (e) {
+        alert('Lỗi import: ' + e.message);
+      }
+    }
+
+    // ----------------- Multi-Site Hub JS -----------------
+    async function loadSaaSSites() {
+      try {
+        const res = await fetch('/api/v1/saas/dashboard/global');
+        const data = await res.json();
+        if (data.success && data.dashboard) {
+          const d = data.dashboard;
+          document.getElementById('saas-stat-total-sites').innerText = d.total_sites || 0;
+          document.getElementById('saas-stat-total-entities').innerText = (d.aggregate_metrics && d.aggregate_metrics.total_entities) || 0;
+          document.getElementById('saas-stat-total-drafts').innerText = (d.aggregate_metrics && d.aggregate_metrics.total_drafts) || 0;
+          document.getElementById('saas-stat-gsc-impressions').innerText = (d.aggregate_metrics && d.aggregate_metrics.total_gsc_impressions) || 0;
+          document.getElementById('saas-stat-affiliate-clicks').innerText = (d.aggregate_metrics && d.aggregate_metrics.total_affiliate_clicks) || 0;
+
+          const tbody = document.getElementById('saas-sites-tbody');
+          tbody.innerHTML = '';
+          (d.sites || []).forEach(s => {
+            const isActive = s.lifecycle_status === 'ACTIVE';
+            const badgeClass = isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200';
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-4">
+                  <div class="font-bold text-slate-900">${s.site_name}</div>
+                  <div class="font-mono text-[11px] text-indigo-600">${s.domain}</div>
+                </td>
+                <td class="py-3 px-4 font-mono text-purple-700 font-bold">${s.niche_id}</td>
+                <td class="py-3 px-4">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">${s.lifecycle_status}</span>
+                </td>
+                <td class="py-3 px-4">
+                  ${isActive ? '<span class="text-emerald-600 font-bold">✔ Đang chạy</span>' : '<span class="text-slate-400">Đang khóa</span>'}
+                </td>
+                <td class="py-3 px-4 font-mono font-bold text-slate-800">${s.entities || 0}</td>
+                <td class="py-3 px-4 font-mono text-slate-600">${s.drafts || 0}</td>
+                <td class="py-3 px-4 font-mono text-slate-600">${s.published || 0}</td>
+                <td class="py-3 px-4 text-right space-x-1.5">
+                  <button onclick="switchSaaSSiteContext('${s.site_id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] rounded transition">
+                    Chọn Site
+                  </button>
+                  <button onclick="toggleSiteLifecycle('${s.site_id}', '${s.lifecycle_status}')" class="px-2.5 py-1 ${isActive ? 'bg-amber-50 hover:bg-amber-100 text-amber-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'} font-bold text-[11px] rounded transition">
+                    ${isActive ? 'Tạm Dừng' : 'Kích Hoạt'}
+                  </button>
+                </td>
+              </tr>
+            `;
+          });
+          lucide.createIcons();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function switchSaaSSiteContext(siteId) {
+      try {
+        const res = await fetch('/api/v1/saas/context/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ site_id: siteId })
+        });
+        const data = await res.json();
+        if (data.success && data.active_site) {
+          document.getElementById('active-workspace-label').innerText = `🌐 ${data.active_site.site_name}`;
+          alert(`Đã chuyển ngữ cảnh làm việc sang: ${data.active_site.site_name} (${data.active_site.domain})`);
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function toggleSiteLifecycle(siteId, currentStatus) {
+      const nextStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+      try {
+        const res = await fetch(`/api/v1/saas/sites/${siteId}/lifecycle`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadSaaSSites();
+        }
+      } catch (e) {
+        alert(e.message);
       }
     }
 
@@ -2096,6 +2937,7 @@
     });
 
     async function checkStatus() {
+
       try {
         const res = await fetch('/api/status');
         const data = await res.json();
