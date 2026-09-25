@@ -11,11 +11,17 @@ else:
     load_dotenv(BASE_DIR / ".env.example")
 
 class Settings:
+    # Database Configuration (PostgreSQL / SQLite)
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'data' / 'affiliate.db'}")
+
+    # Publishing Safe Gate
+    AUTO_PUBLISH: bool = os.getenv("AUTO_PUBLISH", "false").lower() == "true"
+
     # WordPress
     WP_URL: str = os.getenv("WP_URL", "").rstrip("/")
     WP_USERNAME: str = os.getenv("WP_USERNAME", "")
     WP_APP_PASSWORD: str = os.getenv("WP_APP_PASSWORD", "")
-    WP_POST_STATUS: str = os.getenv("WP_POST_STATUS", "draft")
+    WP_POST_STATUS: str = "draft" if not (os.getenv("AUTO_PUBLISH", "false").lower() == "true") else os.getenv("WP_POST_STATUS", "draft")
     WP_DEFAULT_AUTHOR_ID: int = int(os.getenv("WP_DEFAULT_AUTHOR_ID", "1"))
 
     # Amazon Affiliate

@@ -3,6 +3,7 @@ import os
 import requests
 from typing import Optional, Dict, Any, List
 from core.config import settings
+from core.database import get_connection
 
 class WordPressClient:
     """
@@ -108,9 +109,13 @@ class WordPressClient:
         Đăng bài viết mới lên WordPress kèm theo Schema JSON-LD và SEO metadata (Yoast / RankMath).
         Hỗ trợ đặt lịch hẹn giờ tự động đăng (Scheduled Future Post) qua REST API chuẩn WordPress.
         """
-        post_status = status or settings.WP_POST_STATUS
+        # Safe Publish Gate: Unless AUTO_PUBLISH is explicitly True, post_status must ALWAYS be 'draft'
         if publish_date:
             post_status = "future"
+        elif not settings.AUTO_PUBLISH:
+            post_status = "draft"
+        else:
+            post_status = status or "draft"
 
         payload = {
             "title": title,
@@ -153,6 +158,46 @@ class WordPressClient:
             return {"success": False, "status_code": res.status_code, "error": res.text}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    @classmethod
+    def save_wordpress_metadata(
+        cls,
+        local_article_id: int,
+        wordpress_post_id: int,
+        wordpress_url: str,
+        page_type: str = "review",
+        primary_entity_id: Optional[str] = None,
+        quality_score: Optional[float] = None,
+        quality_decision: Optional[str] = None
+    ) -> None:
+        """
+        Stores synchronization and verification mapping in articles table:
+        local_article_id, wordpress_post_id, wordpress_url, page_type,
+        primary_entity_id, quality_score, quality_decision, last_verified_at.
+        """
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE articles SET
+            wp_post_id = ?,
+            wp_link = ?,
+            page_type = ?,
+            primary_entity_id = ?,
+            quality_score = ?,
+            quality_decision = ?,
+            last_verified_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """, (
+            wordpress_post_id,
+            wordpress_url,
+            page_type,
+            primary_entity_id,
+            quality_score,
+            quality_decision,
+            local_article_id
+        ))
+        conn.commit()
+        conn.close()
 
     @staticmethod
     def generate_product_schema_jsonld(

@@ -5,10 +5,30 @@ import secrets
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from core.config import settings
 
 DB_DIR = Path(__file__).resolve().parent.parent / "data"
 DB_DIR.mkdir(exist_ok=True)
 DB_PATH = DB_DIR / "affiliate.db"
+
+_engine = None
+_SessionLocal = None
+
+def get_engine():
+    global _engine
+    if _engine is None:
+        url = settings.DATABASE_URL
+        connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+        _engine = create_engine(url, connect_args=connect_args)
+    return _engine
+
+def get_db_session() -> Session:
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+    return _SessionLocal()
 
 def get_connection():
     conn = sqlite3.connect(str(DB_PATH), timeout=30.0)
@@ -26,9 +46,22 @@ def verify_password(password: str, hashed: str, salt: str) -> bool:
     return check_hash == hashed
 
 def init_db():
-    """Khởi tạo toàn bộ cấu trúc cơ sở dữ liệu Multi-Tenant SaaS."""
+    """Khởi tạo toàn bộ cấu trúc cơ sở dữ liệu Multi-Tenant SaaS & Data Authority Engine."""
     conn = get_connection()
     cursor = conn.cursor()
+
+    # 0. Bảng Dự Án (Projects)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS projects (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(128) NOT NULL,
+        niche VARCHAR(64) NOT NULL,
+        target_country VARCHAR(16) DEFAULT 'US',
+        config_json TEXT DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
     # 1. Bảng Người Dùng (Users)
     cursor.execute("""
@@ -416,11 +449,51 @@ def init_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action, entity_id)")
 
+    # 27. Bảng Liên Kết Nội Bộ (Internal Links)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS internal_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id INTEGER DEFAULT 1,
+        source_url TEXT NOT NULL,
+        target_url TEXT NOT NULL,
+        anchor_text VARCHAR(255) NOT NULL,
+        anchor_type VARCHAR(32) DEFAULT 'natural',
+        context_snippet TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internal_link_source ON internal_links(source_url)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internal_link_target ON internal_links(target_url)")
+
 
     # Tự động migrate thêm cột nếu bảng đã tồn tại từ trước
-    for col, tbl in [("workspace_id", "articles"), ("site_id", "articles"), ("workspace_id", "rank_history")]:
+    schema_patches = [
+        ("workspace_id", "articles", "INTEGER DEFAULT 1"),
+        ("site_id", "articles", "INTEGER"),
+        ("page_type", "articles", "VARCHAR(32) DEFAULT 'review'"),
+        ("primary_entity_id", "articles", "VARCHAR(64)"),
+        ("quality_score", "articles", "REAL"),
+        ("quality_decision", "articles", "VARCHAR(32)"),
+        ("last_verified_at", "articles", "TIMESTAMP"),
+        ("workspace_id", "rank_history", "INTEGER DEFAULT 1"),
+        ("project_id", "page_plans", "VARCHAR(64)"),
+        ("project_id", "entities", "VARCHAR(64)"),
+        ("priority", "sources", "INTEGER DEFAULT 3"),
+        ("http_status", "sources", "INTEGER DEFAULT 200"),
+        ("content_hash", "sources", "VARCHAR(64)"),
+        ("parser_version", "sources", "VARCHAR(16) DEFAULT '1.0'"),
+        ("is_stale", "sources", "BOOLEAN DEFAULT 0"),
+        ("offer_status", "merchant_offers", "VARCHAR(16) DEFAULT 'ACTIVE'"),
+        ("hard_blockers_json", "page_quality_evaluations", "TEXT DEFAULT '[]'"),
+        ("fact_id", "claim_validations", "VARCHAR(64)"),
+        ("calculation_id", "claim_validations", "INTEGER"),
+        ("evidence_id", "claim_validations", "INTEGER"),
+        ("source_id", "claim_validations", "INTEGER"),
+        ("created_at", "evidence_claims", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+    ]
+    for col, tbl, col_type in schema_patches:
         try:
-            cursor.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} INTEGER DEFAULT 1")
+            cursor.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type}")
         except sqlite3.OperationalError:
             pass
 
@@ -451,6 +524,33 @@ def init_db():
     conn.close()
 
 # Helper Functions
+def create_project(project_id: str, name: str, niche: str, target_country: str = "US", config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    config_str = json.dumps(config or {})
+    cursor.execute("""
+    INSERT OR REPLACE INTO projects (id, name, niche, target_country, config_json, updated_at)
+    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (project_id, name, niche, target_country, config_str))
+    conn.commit()
+    conn.close()
+    return {"id": project_id, "name": name, "niche": niche, "target_country": target_country, "config": config or {}}
+
+def get_project(project_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM projects WHERE id = ?", (project_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        d = dict(row)
+        try:
+            d["config"] = json.loads(d.get("config_json") or "{}")
+        except:
+            d["config"] = {}
+        return d
+    return None
+
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()

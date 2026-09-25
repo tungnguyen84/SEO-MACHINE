@@ -5,7 +5,11 @@ engineering calculations, and search intent.
 """
 from typing import Dict, Any, List, Optional
 import re
-from core.database import list_entities, get_entity, get_entity_attributes, get_compatibility
+import json
+from core.database import (
+    list_entities, get_entity, get_entity_attributes,
+    get_compatibility, get_evidence_claims, get_connection
+)
 from core.engine.calculation import CalculationEngine
 from core.engine.compatibility import CompatibilityEngine
 
@@ -236,3 +240,71 @@ class PagePlanner:
                 })
 
         return results
+
+    @classmethod
+    def evaluate_page_decision(
+        cls,
+        keyword: str,
+        target_entity_ids: Optional[List[str]] = None,
+        existing_planned_keywords: Optional[List[str]] = None,
+        min_evidence_count: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Evaluates page action against evidence availability and cannibalization.
+        Priority 5: If evidence is missing or insufficient, returns RESEARCH_REQUIRED.
+        """
+        # First check clustering / cannibalization against existing pages
+        clusters = cls.cluster_keywords([keyword], existing_planned_keywords=existing_planned_keywords)
+        base_decision = clusters[0] if clusters else {"action": "CREATE", "reason": "New pillar query"}
+
+        if base_decision["action"] in ["UPDATE_EXISTING", "SKIP", "MERGE", "NOINDEX"]:
+            return base_decision
+
+        # For potential CREATE pages, strictly verify evidence availability
+        if target_entity_ids:
+            total_claims = 0
+            for eid in target_entity_ids:
+                claims = get_evidence_claims(eid)
+                total_claims += len(claims)
+
+            if total_claims < min_evidence_count:
+                return {
+                    "keyword": keyword,
+                    "action": "RESEARCH_REQUIRED",
+                    "reason": f"Required evidence count not met ({total_claims} < {min_evidence_count}). Ground-truth ingestion needed before drafting content.",
+                    "intent": cls.detect_intent(keyword),
+                    "missing_evidence_entities": target_entity_ids
+                }
+
+        return base_decision
+
+    @classmethod
+    def create_page_plan(
+        cls,
+        target_keyword: str,
+        intent_type: str,
+        target_entity_ids: Optional[List[str]] = None,
+        factual_brief: Optional[Dict[str, Any]] = None,
+        workspace_id: int = 1,
+        project_id: Optional[str] = None,
+        plan_action: str = "CREATE"
+    ) -> int:
+        """
+        Persists a page plan to the database and returns plan_id.
+        """
+        conn = get_connection()
+        cursor = conn.cursor()
+        entities_str = json.dumps(target_entity_ids or [])
+        brief_str = json.dumps(factual_brief or {})
+
+        cursor.execute("""
+        INSERT INTO page_plans (
+            workspace_id, project_id, target_keyword, intent_type,
+            plan_action, target_entity_ids, factual_brief_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (workspace_id, project_id, target_keyword, intent_type, plan_action, entities_str, brief_str))
+
+        plan_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return plan_id

@@ -97,6 +97,30 @@ class EntityManager:
         )
 
     @staticmethod
+    def add_evidence_claim(
+        entity_id: str,
+        source_id: int,
+        attribute_key: str,
+        extracted_value: str,
+        raw_quote: str,
+        page_number: Optional[int] = None,
+        status: str = "VERIFIED"
+    ) -> int:
+        return add_evidence_claim(
+            entity_id=entity_id,
+            source_id=source_id,
+            attribute_key=attribute_key,
+            extracted_value=extracted_value,
+            raw_quote=raw_quote,
+            page_number=page_number,
+            status=status
+        )
+
+    @staticmethod
+    def get_evidence_claims(entity_id: str) -> List[Dict[str, Any]]:
+        return get_evidence_claims(entity_id)
+
+    @staticmethod
     def link_merchant(
         entity_id: str,
         merchant_name: str,
