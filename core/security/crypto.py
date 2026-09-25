@@ -43,11 +43,11 @@ class EncryptionManager:
         env = os.getenv("APP_ENV") or os.getenv("ENV") or "development"
         env_key_b64 = os.getenv("OPENSEO_ENCRYPTION_KEY")
 
-        if env.lower() == "production":
+        if env.lower() in ("production", "staging"):
             if not env_key_b64 or len(env_key_b64.strip()) < 32:
                 raise RuntimeError(
-                    "CRITICAL PRODUCTION ERROR: OPENSEO_ENCRYPTION_KEY is required and must be "
-                    "at least 32 bytes (256-bit) base64 or hex encoded in production mode."
+                    f"CRITICAL ERROR: Environment '{env}' requires OPENSEO_ENCRYPTION_KEY "
+                    "with at least 32 bytes (256-bit) entropy."
                 )
 
         if env_key_b64:

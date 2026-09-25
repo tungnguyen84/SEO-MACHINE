@@ -10,9 +10,17 @@ if env_path.exists():
 else:
     load_dotenv(BASE_DIR / ".env.example")
 
+
 class Settings:
+    # Environment Management: development | test | staging | production
+    ENV: str = os.getenv("OPENSEO_ENV", os.getenv("APP_ENV", "development")).lower()
+
     # Database Configuration (PostgreSQL / SQLite)
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'data' / 'affiliate.db'}")
+
+    # Cryptographic & Auth Master Secrets
+    OPENSEO_ENCRYPTION_KEY: str = os.getenv("OPENSEO_ENCRYPTION_KEY", "")
+    OPENSEO_JWT_SECRET: str = os.getenv("OPENSEO_JWT_SECRET", os.getenv("JWT_SECRET_KEY", ""))
 
     # Publishing Safe Gate
     AUTO_PUBLISH: bool = os.getenv("AUTO_PUBLISH", "false").lower() == "true"
@@ -49,9 +57,11 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
 
-    # DataForSEO
+    # DataForSEO / SERP Providers
     DATAFORSEO_LOGIN: str = os.getenv("DATAFORSEO_LOGIN", "")
     DATAFORSEO_PASSWORD: str = os.getenv("DATAFORSEO_PASSWORD", "")
+    SERPAPI_API_KEY: str = os.getenv("SERPAPI_API_KEY", "")
+    VALUESERP_API_KEY: str = os.getenv("VALUESERP_API_KEY", "")
 
     # Branding & Legal
     SITE_NAME: str = os.getenv("SITE_NAME", "TopPicks Advisor")
@@ -59,5 +69,29 @@ class Settings:
         "AFFILIATE_DISCLOSURE",
         "As an Amazon Associate and affiliate partner, we earn from qualifying purchases at no additional cost to you."
     )
+
+    def validate_production_staging_environment(self):
+        """
+        Enforces strict environment separation.
+        In STAGING or PRODUCTION, startup strictly FAILS if attempting to use SQLite,
+        missing encryption master key, or missing JWT secret.
+        """
+        if self.ENV in ("staging", "production"):
+            if self.DATABASE_URL.startswith("sqlite"):
+                raise RuntimeError(
+                    f"CRITICAL BOOT FAILURE: Environment '{self.ENV}' cannot run on SQLite. "
+                    "A real PostgreSQL 16 database connection string is strictly required."
+                )
+            if not self.OPENSEO_ENCRYPTION_KEY or len(self.OPENSEO_ENCRYPTION_KEY.strip()) < 32:
+                raise RuntimeError(
+                    f"CRITICAL BOOT FAILURE: Environment '{self.ENV}' requires a secure 256-bit "
+                    "OPENSEO_ENCRYPTION_KEY (at least 32 bytes)."
+                )
+            if not self.OPENSEO_JWT_SECRET or len(self.OPENSEO_JWT_SECRET.strip()) < 32:
+                raise RuntimeError(
+                    f"CRITICAL BOOT FAILURE: Environment '{self.ENV}' requires a secure "
+                    "OPENSEO_JWT_SECRET (at least 32 bytes)."
+                )
+
 
 settings = Settings()

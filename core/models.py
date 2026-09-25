@@ -82,23 +82,54 @@ class ConnectedSite(Base):
 
 
 class Job(Base):
-    """Observable Background Tasks"""
+    """Observable Background Tasks with Multi-Worker Distributed Leases"""
     __tablename__ = "jobs"
 
     id = Column(String(64), primary_key=True)
     workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default=1)
     project_id = Column(String(64), nullable=True)
+    tenant_id = Column(String(64), nullable=True, index=True)
+    site_id = Column(String(128), nullable=True, index=True)
     job_type = Column(String(64), nullable=False)
-    status = Column(String(32), default="QUEUED")  # QUEUED, RUNNING, SUCCESS, FAILED, REVIEW_REQUIRED
+    status = Column(String(32), default="QUEUED")  # QUEUED, RUNNING, SUCCEEDED, FAILED, RETRYING, DEAD_LETTER
     progress = Column(Integer, default=0)
     retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
     error = Column(Text, nullable=True)
     input_summary = Column(Text, nullable=True)
     output_summary = Column(Text, nullable=True)
+    payload_json = Column(Text, nullable=True)
     result_json = Column(Text, nullable=True)
+    idempotency_key = Column(String(128), nullable=True, index=True)
+    locked_by = Column(String(128), nullable=True)
+    locked_at = Column(DateTime, nullable=True)
+    lease_expires_at = Column(DateTime, nullable=True, index=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_jobs_lease", "status", "lease_expires_at"),
+    )
+
+
+class SiteCredential(Base):
+    """Encrypted Credential Storage in Database"""
+    __tablename__ = "site_credentials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    site_id = Column(String(128), nullable=False, index=True)
+    key_name = Column(String(128), nullable=False)
+    encrypted_value = Column(Text, nullable=False)
+    key_version = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("site_id", "key_name", name="uq_site_credential_key"),
+        Index("idx_site_cred_tenant", "tenant_id", "site_id"),
+    )
 
 
 class CloakedLink(Base):

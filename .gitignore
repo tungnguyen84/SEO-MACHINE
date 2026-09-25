@@ -39,3 +39,9 @@ cloudflared.exe
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local database instances & staging backups
+.pg_dist/
+.pgsql16/
+backups/*.sql
+!backups/.gitkeep

@@ -34,9 +34,9 @@ class TokenManager:
     def get_secret(cls) -> str:
         key = os.getenv("OPENSEO_JWT_SECRET") or os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY")
         env = os.getenv("APP_ENV") or os.getenv("ENV") or "development"
-        if env.lower() == "production":
+        if env.lower() in ("production", "staging"):
             if not key or key == "openseo-dev-key-change-in-prod" or len(key) < 32:
-                raise RuntimeError("Production security error: Strong OPENSEO_JWT_SECRET required in production.")
+                raise RuntimeError(f"CRITICAL ERROR: Environment '{env}' requires strong OPENSEO_JWT_SECRET (>= 32 bytes).")
         return key or "openseo-production-grade-jwt-secret-key-32bytes-min"
 
     @classmethod
