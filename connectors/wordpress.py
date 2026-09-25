@@ -24,6 +24,15 @@ class WordPressClient:
             "User-Agent": "OpenSEO-Affiliate-Bot/1.0"
         }
 
+    @classmethod
+    def from_site_profile(cls, site_profile: Any) -> "WordPressClient":
+        """Instantiates client configured strictly for a specific SiteProfile."""
+        wp_conn = site_profile.wordpress_connection if hasattr(site_profile, "wordpress_connection") else {}
+        url = wp_conn.get("site_url")
+        username = wp_conn.get("username")
+        password = wp_conn.get("app_password")
+        return cls(url=url, username=username, password=password)
+
     def test_connection(self) -> Dict[str, Any]:
         """Kiểm tra kết nối và thông tin người dùng quản trị."""
         try:

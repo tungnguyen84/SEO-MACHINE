@@ -241,7 +241,7 @@ def init_db():
     )
     """)
 
-    # 13. Bảng Thực Thể (Generic Product / Vehicle / Gear Entity)
+    # 13. Bảng Thực Thể (Generic Domain Entity)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS entities (
         id VARCHAR(64) PRIMARY KEY,

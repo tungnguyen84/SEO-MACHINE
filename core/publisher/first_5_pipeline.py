@@ -1,6 +1,6 @@
 """
-First 5 Experiment Pipeline.
-Generates, audits, and registers the 5 Subaru Outback cluster pages
+First 5 Pilot Experiment Pipeline.
+Generates, audits, and registers the initial reference cluster pages
 with strict data-first components, editorial review, and draft-only status.
 """
 import re
@@ -34,29 +34,31 @@ class First5ComponentsRenderer:
     def render_fitment_card(
         cls,
         product_name: str,
-        vehicle_name: str,
-        physical_fit: str,
-        clearance_in: float,
-        cover_status: str,
-        electrical_status: str,
-        evidence_source: str,
-        confidence: float,
-        last_verified: str
+        subject_name: Optional[str] = None,
+        physical_fit: str = "PASS",
+        clearance_in: float = 0.0,
+        cover_status: str = "",
+        electrical_status: str = "",
+        evidence_source: str = "",
+        confidence: float = 1.0,
+        last_verified: str = "",
+        **kwargs
     ) -> str:
+        subj = subject_name or kwargs.get("vehicle_name", "Target Equipment")
         fit_color = "#2e7d32" if physical_fit == "PASS" else "#c62828"
         return f"""
 <div class="fitment-card" style="border:2px solid {fit_color};border-radius:8px;padding:20px;margin:24px 0;background:#ffffff;box-shadow:0 2px 4px rgba(0,0,0,0.05);">
   <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:12px;margin-bottom:16px;">
-    <h3 style="margin:0;font-size:1.25em;color:#1a202c;">Verified Fitment Card: {product_name} &times; {vehicle_name}</h3>
+    <h3 style="margin:0;font-size:1.25em;color:#1a202c;">Verified Fitment Card: {product_name} &times; {subj}</h3>
     <span style="background:{fit_color};color:#ffffff;padding:4px 12px;border-radius:4px;font-weight:bold;font-size:0.9em;">FIT: {physical_fit} (CALCULATED)</span>
   </div>
   <table style="width:100%;border-collapse:collapse;font-size:0.95em;">
     <tr style="border-bottom:1px solid #f1f5f9;">
-      <td style="padding:8px 0;color:#64748b;font-weight:600;">Vertical Hatch Clearance:</td>
+      <td style="padding:8px 0;color:#64748b;font-weight:600;">Vertical Clearance:</td>
       <td style="padding:8px 0;font-weight:bold;color:#1e293b;">{clearance_in:.1f} inches overhead headroom (Sill opening 30.1" vs Appliance 18.5")</td>
     </tr>
     <tr style="border-bottom:1px solid #f1f5f9;">
-      <td style="padding:8px 0;color:#64748b;font-weight:600;">Factory Cargo Cover:</td>
+      <td style="padding:8px 0;color:#64748b;font-weight:600;">Cover Clearance:</td>
       <td style="padding:8px 0;color:#e11d48;font-weight:bold;">{cover_status}</td>
     </tr>
     <tr style="border-bottom:1px solid #f1f5f9;">

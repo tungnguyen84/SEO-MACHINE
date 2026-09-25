@@ -1,0 +1,68 @@
+niche_id: "home_solar"
+name: "Residential Solar & Battery Storage"
+capabilities:
+  - "CALCULATION"
+  - "PRODUCT_DATABASE"
+  - "TECHNICAL_SPECS"
+  - "COMPARISON"
+  - "AFFILIATE_COMMERCE"
+risk_profile: "MEDIUM"
+entity_types:
+  - "solar_panel"
+  - "inverter"
+  - "home_battery"
+attributes:
+  solar_panel:
+    - key: "rated_watts"
+      display_name: "Rated Power Output"
+      data_type: "numeric"
+      unit_type: "W"
+      required: true
+      criticality: "CRITICAL"
+      freshness_policy: "SEMI_DYNAMIC"
+    - key: "efficiency_pct"
+      display_name: "Module Efficiency"
+      data_type: "numeric"
+      unit_type: "%"
+      required: true
+      criticality: "IMPORTANT"
+      freshness_policy: "STATIC"
+  home_battery:
+    - key: "usable_capacity_kwh"
+      display_name: "Usable Battery Capacity"
+      data_type: "numeric"
+      unit_type: "kWh"
+      required: true
+      criticality: "CRITICAL"
+      freshness_policy: "SEMI_DYNAMIC"
+    - key: "continuous_power_kw"
+      display_name: "Continuous Power Rating"
+      data_type: "numeric"
+      unit_type: "kW"
+      required: true
+      criticality: "CRITICAL"
+      freshness_policy: "SEMI_DYNAMIC"
+intent_taxonomy:
+  ENGINEERING_RUNTIME:
+    - "how many panels"
+    - "battery backup hours"
+    - "kwh production"
+  VS_COMPARISON:
+    - " vs "
+    - " versus "
+    - " compare "
+domain_stop_words:
+  - "guide"
+  - "calculator"
+  - "system"
+  - "cost"
+cluster_differentiators:
+  - "tesla"
+  - "enphase"
+  - "solaredge"
+  - "powerwall"
+  - "iq8"
+known_competitors:
+  energysage.com: "EDITORIAL"
+  solarreviews.com: "EDITORIAL"
+  diysolarforum.com: "FORUM"

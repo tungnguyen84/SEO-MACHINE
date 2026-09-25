@@ -214,7 +214,7 @@ class ScheduledPost(Base):
 
 
 class Entity(Base):
-    """Canonical Real-World Entity (Vehicle, Fridge, Battery, Solar Panel)"""
+    """Canonical Real-World Domain Entity"""
     __tablename__ = "entities"
 
     id = Column(String(64), primary_key=True)

@@ -1,8 +1,9 @@
 """
 OpenSEO Engineering & Physics Calculation Engine
-Calculates real-world battery runtimes, inverter efficiencies, thermal de-rating, and vehicle fit.
+Calculates real-world battery runtimes, inverter efficiencies, thermal de-rating,
+dimensional clearance, and cross-domain entity interoperability.
 """
-from .calculation import CalculationEngine
-from .compatibility import CompatibilityEngine
+from .calculation import CalculationEngine, CalculationRegistry
+from .compatibility import CompatibilityEngine, CompatibilityRuleEngine
 
-__all__ = ["CalculationEngine", "CompatibilityEngine"]
+__all__ = ["CalculationEngine", "CalculationRegistry", "CompatibilityEngine", "CompatibilityRuleEngine"]

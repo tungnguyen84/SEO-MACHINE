@@ -1,27 +1,39 @@
 """
 Page Planner
 Generates structured content briefs bound strictly to verified database entities,
-engineering calculations, and search intent.
+engineering calculations, and search intent across any active domain niche.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 import re
 import json
 from core.database import (
     list_entities, get_entity, get_entity_attributes,
     get_compatibility, get_evidence_claims, get_connection
 )
-from core.engine.calculation import CalculationEngine
+from core.engine.calculation import CalculationEngine, CalculationRegistry
 from core.engine.compatibility import CompatibilityEngine
+from core.niche_adapters.base_adapter import NicheAdapter
+from core.niche_adapters.registry import NicheRegistry
+
 
 class PagePlanner:
     """Orchestrates search intent detection, entity selection, and verified data brief generation."""
 
     @classmethod
-    def detect_intent(cls, keyword: str) -> str:
+    def detect_intent(cls, keyword: str, adapter: Optional[NicheAdapter] = None) -> str:
+        """Determines search intent using active adapter taxonomy or generic heuristics."""
+        if adapter is None:
+            adapter = NicheRegistry.get_active()
+
         kw = keyword.lower()
+        if adapter and hasattr(adapter, "intent_taxonomy") and adapter.intent_taxonomy:
+            for intent_name, tokens in adapter.intent_taxonomy.items():
+                if any(t in kw for t in tokens):
+                    return intent_name
+
         if " vs " in kw or " versus " in kw or " compare " in kw:
             return "VS_COMPARISON"
-        if "fit in" in kw or "compatibility" in kw or "compatible with" in kw or "for my " in kw or "for " in kw and any(v in kw for v in ["outback", "rav4", "bronco", "subaru", "toyota", "ford", "suv", "car"]):
+        if any(term in kw for term in ["fit in", "compatibility", "compatible with", "for my "]) or ("for " in kw and not any(r in kw for r in ["best", "top", "review"])):
             return "COMPATIBILITY_GUIDE"
         if "runtime" in kw or "how long" in kw or "can run" in kw:
             return "ENGINEERING_RUNTIME"
@@ -30,12 +42,20 @@ class PagePlanner:
         return "IN_DEPTH_SPECS"
 
     @classmethod
-    def plan_content(cls, keyword: str, target_entity_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    def plan_content(
+        cls,
+        keyword: str,
+        target_entity_ids: Optional[List[str]] = None,
+        adapter: Optional[NicheAdapter] = None
+    ) -> Dict[str, Any]:
         """
         Creates a factual, closed-context brief for LLM writer.
         No hallucinations permitted.
         """
-        intent = cls.detect_intent(keyword)
+        if adapter is None:
+            adapter = NicheRegistry.get_active()
+
+        intent = cls.detect_intent(keyword, adapter=adapter)
         entities_data = []
 
         if target_entity_ids:
@@ -55,7 +75,6 @@ class PagePlanner:
                     matched.append(e["id"])
 
             if not matched:
-                # Default to top relevant seeded entities
                 matched = [e["id"] for e in all_ents[:3]]
 
             for eid in matched:
@@ -80,34 +99,43 @@ class PagePlanner:
                 "offers": ent.get("merchant_offers", [])
             })
 
-        # Run calculations based on combinations
-        power_stations = [e for e in entities_data if e["entity_type"] == "power_station"]
-        fridges = [e for e in entities_data if e["entity_type"] == "portable_fridge"]
-        vehicles = [e for e in entities_data if e["entity_type"] == "vehicle"]
+        # Dynamic cross-evaluation of entities across any registered domain
+        for i, ent1 in enumerate(entities_data):
+            for ent2 in entities_data[i+1:]:
+                comp = CompatibilityEngine.evaluate(ent1["id"], ent2["id"])
+                if comp.get("compatibility_status") != "UNKNOWN":
+                    card = {
+                        "subject": f"{ent1['brand']} {ent1['model']}",
+                        "target": f"{ent2['brand']} {ent2['model']}",
+                        "status": comp.get("compatibility_status"),
+                        "detail": comp.get("fit_detail"),
+                        "html": comp.get("data_box_html")
+                    }
+                    compatibility_cards.append(card)
 
-        # Cross calculate power + fridge
-        for p in power_stations:
-            for f in fridges:
-                comp = CompatibilityEngine.evaluate(p["id"], f["id"])
-                calculations.append({
-                    "subject": f"{p['brand']} {p['model']}",
-                    "target": f"{f['brand']} {f['model']}",
-                    "type": "Runtime Autonomy",
-                    "result": comp.get("fit_detail"),
-                    "html": comp.get("data_box_html")
-                })
+                    if comp.get("runtime_calc"):
+                        calculations.append({
+                            "subject": f"{ent1['brand']} {ent1['model']}",
+                            "target": f"{ent2['brand']} {ent2['model']}",
+                            "type": "Runtime Autonomy",
+                            "result": comp.get("fit_detail"),
+                            "html": comp.get("data_box_html")
+                        })
 
-        # Cross calculate vehicle + fridge or vehicle + power
-        for v in vehicles:
-            for g in (fridges + power_stations):
-                comp = CompatibilityEngine.evaluate(v["id"], g["id"])
-                compatibility_cards.append({
-                    "vehicle": f"{v['brand']} {v['model']}",
-                    "gear": f"{g['brand']} {g['model']}",
-                    "status": comp.get("compatibility_status"),
-                    "detail": comp.get("fit_detail"),
-                    "html": comp.get("data_box_html")
-                })
+        allowed_claims = [
+            "Only cite numbers explicitly provided in verified_specs_table and calculations.",
+            "Answer the search query directly in the very first 100 words.",
+            "Compare based on measured physics, capacity ratings, and physical dimensions."
+        ]
+        prohibited_claims = [
+            "Do NOT use 'we tested', 'our hands-on test', 'in our laboratory', or 'we drove'.",
+            "Do NOT invent capacities or dimensions not listed in the verified facts.",
+            "Do NOT claim subjective opinions as laboratory facts."
+        ]
+
+        if adapter and hasattr(adapter, "quality_requirements"):
+            extra_forbidden = adapter.quality_requirements.get("forbidden_claims", [])
+            prohibited_claims.extend(extra_forbidden)
 
         brief = {
             "keyword": keyword,
@@ -115,63 +143,59 @@ class PagePlanner:
             "entities": verified_specs_table,
             "calculations": calculations,
             "compatibility_cards": compatibility_cards,
-            "allowed_claims": [
-                "Only cite numbers explicitly provided in verified_specs_table and calculations.",
-                "Answer the search query directly in the very first 100 words.",
-                "Compare based on measured physics, capacity Wh, and physical dimensions."
-            ],
-            "prohibited_claims": [
-                "Do NOT use 'we tested', 'our hands-on test', 'in our laboratory', or 'we drove'.",
-                "Do NOT invent battery capacities or dimensions not listed in the facts.",
-                "Do NOT claim subjective opinions as laboratory facts."
-            ]
+            "allowed_claims": allowed_claims,
+            "prohibited_claims": prohibited_claims
         }
         return brief
 
     @classmethod
-    def _extract_semantic_fingerprint(cls, keyword: str) -> set:
+    def _extract_semantic_fingerprint(cls, keyword: str, adapter: Optional[NicheAdapter] = None) -> Set[str]:
         """Extracts core semantic tokens ignoring stop words and word order."""
-        stop_words = {"for", "in", "the", "a", "an", "best", "top", "my", "to", "and", "of", "with", "guide", "setup", "review", "reviews"}
+        if adapter is None:
+            adapter = NicheRegistry.get_active()
+
+        stop_words = {"for", "in", "the", "a", "an", "best", "top", "my", "to", "and", "of", "with"}
+        if adapter and hasattr(adapter, "get_domain_stop_words"):
+            stop_words.update(adapter.get_domain_stop_words())
+
         tokens = re.findall(r"\b[a-z0-9]+\b", keyword.lower())
         meaningful = {t for t in tokens if t not in stop_words}
-        normalized = set()
-        for t in meaningful:
-            if t in ["refrigerator", "cooler"]:
-                normalized.add("fridge")
-            elif t in ["camping", "camper"]:
-                normalized.add("camp")
-            else:
-                normalized.add(t)
-        return normalized
+
+        if adapter and hasattr(adapter, "get_semantic_synonyms"):
+            synonyms = adapter.get_semantic_synonyms()
+            meaningful = {synonyms.get(t, t) for t in meaningful}
+
+        return meaningful
 
     @classmethod
     def cluster_keywords(
         cls,
         keywords: List[str],
-        existing_planned_keywords: Optional[List[str]] = None
+        existing_planned_keywords: Optional[List[str]] = None,
+        adapter: Optional[NicheAdapter] = None
     ) -> List[Dict[str, Any]]:
         """
-        Groups keywords by intent and semantic similarity.
-        Decides deliberate action for each keyword:
-        - CREATE: Primary keyword for a new pillar/cluster page.
-        - MERGE: Sub-intent/variant to be merged into primary page (H2/H3/FAQ), preventing cannibalization.
-        - UPDATE_EXISTING: Matches a keyword already targeted by an existing published page.
-        - SKIP: Exact duplicate or trivial word order variation.
-        - NOINDEX: Low quality, thin, or out-of-scope query.
+        Groups keywords by intent and semantic similarity across any niche.
+        Prevents keyword cannibalization by assigning CREATE, MERGE, UPDATE_EXISTING, SKIP, or NOINDEX.
         """
+        if adapter is None:
+            adapter = NicheRegistry.get_active()
+
         existing_fingerprints = {}
         if existing_planned_keywords:
             for ekw in existing_planned_keywords:
-                fp = frozenset(cls._extract_semantic_fingerprint(ekw))
+                fp = frozenset(cls._extract_semantic_fingerprint(ekw, adapter=adapter))
                 existing_fingerprints[fp] = ekw
 
         clusters = {}
         results = []
 
+        differentiators = adapter.get_cluster_differentiators() if (adapter and hasattr(adapter, "get_cluster_differentiators")) else set()
+
         for kw in keywords:
             kw_clean = kw.strip()
-            fp = frozenset(cls._extract_semantic_fingerprint(kw_clean))
-            intent = cls.detect_intent(kw_clean)
+            fp = frozenset(cls._extract_semantic_fingerprint(kw_clean, adapter=adapter))
+            intent = cls.detect_intent(kw_clean, adapter=adapter)
 
             # Check if matches existing published page
             existing_match = None
@@ -179,13 +203,15 @@ class PagePlanner:
                 overlap = len(fp & efp)
                 union = len(fp | efp)
                 jaccard = overlap / union if union > 0 else 0
-                has_f1 = any(t in fp for t in ["fridge"])
-                has_f2 = any(t in efp for t in ["fridge"])
-                if has_f1 != has_f2:
-                    continue
-                if jaccard >= 0.60 or fp == efp:
-                    existing_match = orig_title
-                    break
+
+                if adapter and hasattr(adapter, "should_cluster"):
+                    if adapter.should_cluster(set(fp), set(efp), jaccard):
+                        existing_match = orig_title
+                        break
+                else:
+                    if jaccard >= 0.50 or fp == efp:
+                        existing_match = orig_title
+                        break
 
             if existing_match:
                 results.append({
@@ -205,50 +231,30 @@ class PagePlanner:
                 union = len(fp | cluster_fp)
                 jaccard = overlap / union if union > 0 else 0
 
-                # Specific product token differentiation
-                has_product_1 = any(t in fp for t in ["iceco", "vl45", "dometic", "ecoflow", "jackery", "anker"])
-                has_product_2 = any(t in cluster_fp for t in ["iceco", "vl45", "dometic", "ecoflow", "jackery", "anker"])
-
-                has_power_1 = any(t in fp for t in ["power", "battery", "wiring", "socket", "inverter"])
-                has_power_2 = any(t in cluster_fp for t in ["power", "battery", "wiring", "socket", "inverter"])
-
-                has_fridge_1 = any(t in fp for t in ["fridge"])
-                has_fridge_2 = any(t in cluster_fp for t in ["fridge"])
-
-                # If product specificity, power intent, or gear category differs, do NOT merge
-                if has_product_1 != has_product_2 or has_power_1 != has_power_2 or has_fridge_1 != has_fridge_2:
-                    continue
-
-                # Match if fingerprints match or high jaccard
-                if jaccard >= 0.60 or fp == cluster_fp:
-                    matched_cluster_id = cid
-                    break
-                elif has_product_1 and has_product_2:
-                    # Both have same specific product and vehicle
-                    prod_overlap = len(fp & cluster_fp & {"iceco", "vl45", "dometic", "ecoflow", "jackery", "anker"})
-                    veh_overlap = len(fp & cluster_fp & {"outback", "forester", "rav4", "crv", "bronco", "subaru", "toyota", "ford", "honda"})
-                    if prod_overlap > 0 and veh_overlap > 0:
+                if adapter and hasattr(adapter, "should_cluster"):
+                    if adapter.should_cluster(set(fp), set(cluster_fp), jaccard):
                         matched_cluster_id = cid
                         break
-                elif not has_product_1 and not has_product_2 and not has_power_1:
-                    # Both are generic vehicle + gear roundups
-                    if ("outback" in fp and "outback" in cluster_fp and "fridge" in fp and "fridge" in cluster_fp):
+                else:
+                    if jaccard >= 0.50 or fp == cluster_fp:
                         matched_cluster_id = cid
                         break
 
             if matched_cluster_id is None:
                 cid = f"cluster_{len(clusters) + 1}"
-                is_pillar = any(c in fp for c in ["camp", "camping"]) and not any(g in fp for g in ["fridge", "battery", "solar", "cooler"])
-                is_power = any(t in fp for t in ["power", "battery", "wiring", "socket"])
-                
-                if is_pillar:
-                    hierarchy_type = "PILLAR_OVERVIEW"
-                elif is_power:
-                    hierarchy_type = "SECTION_WITHIN_PILLAR"
-                elif any(t in fp for t in ["iceco", "vl45", "dometic"]):
-                    hierarchy_type = "DEDICATED_FITMENT_GUIDE"
+
+                # Determine hierarchy type via adapter hook or clean generic logic
+                if adapter and hasattr(adapter, "get_hierarchy_type"):
+                    hierarchy_type = adapter.get_hierarchy_type(kw_clean, set(fp))
                 else:
-                    hierarchy_type = "CATEGORY_ROUNDUP"
+                    if len(fp) <= 2:
+                        hierarchy_type = "PILLAR_OVERVIEW"
+                    elif any(t in kw_clean.lower() for t in ["power", "battery", "wiring", "socket", "install", "maintenance"]):
+                        hierarchy_type = "SECTION_WITHIN_PILLAR"
+                    elif any(c in fp for c in ["fit", "compatible", "dimensions"]):
+                        hierarchy_type = "DEDICATED_FITMENT_GUIDE"
+                    else:
+                        hierarchy_type = "CATEGORY_ROUNDUP"
 
                 clusters[cid] = {
                     "fingerprint": fp,
@@ -293,20 +299,19 @@ class PagePlanner:
         keyword: str,
         target_entity_ids: Optional[List[str]] = None,
         existing_planned_keywords: Optional[List[str]] = None,
-        min_evidence_count: int = 1
+        min_evidence_count: int = 1,
+        adapter: Optional[NicheAdapter] = None
     ) -> Dict[str, Any]:
         """
         Evaluates page action against evidence availability and cannibalization.
-        Priority 5: If evidence is missing or insufficient, returns RESEARCH_REQUIRED.
+        If evidence is missing or insufficient, returns RESEARCH_REQUIRED.
         """
-        # First check clustering / cannibalization against existing pages
-        clusters = cls.cluster_keywords([keyword], existing_planned_keywords=existing_planned_keywords)
+        clusters = cls.cluster_keywords([keyword], existing_planned_keywords=existing_planned_keywords, adapter=adapter)
         base_decision = clusters[0] if clusters else {"action": "CREATE", "reason": "New pillar query"}
 
         if base_decision["action"] in ["UPDATE_EXISTING", "SKIP", "MERGE", "NOINDEX"]:
             return base_decision
 
-        # For potential CREATE pages, strictly verify evidence availability
         if target_entity_ids:
             total_claims = 0
             for eid in target_entity_ids:
@@ -318,7 +323,7 @@ class PagePlanner:
                     "keyword": keyword,
                     "action": "RESEARCH_REQUIRED",
                     "reason": f"Required evidence count not met ({total_claims} < {min_evidence_count}). Ground-truth ingestion needed before drafting content.",
-                    "intent": cls.detect_intent(keyword),
+                    "intent": cls.detect_intent(keyword, adapter=adapter),
                     "missing_evidence_entities": target_entity_ids
                 }
 
@@ -335,9 +340,7 @@ class PagePlanner:
         project_id: Optional[str] = None,
         plan_action: str = "CREATE"
     ) -> int:
-        """
-        Persists a page plan to the database and returns plan_id.
-        """
+        """Persists a page plan to the database and returns plan_id."""
         conn = get_connection()
         cursor = conn.cursor()
         entities_str = json.dumps(target_entity_ids or [])

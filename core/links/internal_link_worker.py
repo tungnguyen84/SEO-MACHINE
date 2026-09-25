@@ -16,7 +16,7 @@ class InternalLinkWorker:
 
     ANCHOR_TEMPLATES = {
         "brand_model": "{brand} {model}",
-        "partial_match": "{model} camping setup",
+        "partial_match": "{model} technical setup",
         "natural": "read our technical {brand} guide"
     }
 
@@ -25,7 +25,7 @@ class InternalLinkWorker:
         """Generates diverse, natural anchor text variations without exact-match spam."""
         return [
             {"anchor_type": "brand_model", "text": f"{brand} {model}".strip()},
-            {"anchor_type": "partial_match", "text": f"{model} setup for road trips".strip()},
+            {"anchor_type": "partial_match", "text": f"{model} setup guide".strip()},
             {"anchor_type": "natural", "text": f"detailed technical analysis of the {brand} {model}".strip()}
         ]
 

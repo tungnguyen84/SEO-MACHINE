@@ -1,19 +1,18 @@
 """
-Data Models for Products, Vehicles, Specs, and Attributes
+Data Models for Domain Entities, Specs, and Normalized Attributes
 """
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from pydantic import BaseModel, Field
 
 from core.entities.freshness import FreshnessPolicy, AttributeDefinition, FreshnessEngine
 
 class EntityType(str, Enum):
-    POWER_STATION = "power_station"
-    PORTABLE_FRIDGE = "portable_fridge"
-    SOLAR_PANEL = "solar_panel"
-    VEHICLE = "vehicle"
-    CAMPING_GEAR = "camping_gear"
-    BATTERY_ACCESSORY = "battery_accessory"
+    PRODUCT = "product"
+    EQUIPMENT = "equipment"
+    HARDWARE = "hardware"
+    ACCESSORY = "accessory"
+    SPECIFICATION = "specification"
     OTHER = "other"
 
 class EntityAttribute(BaseModel):
@@ -36,7 +35,7 @@ class MerchantOfferModel(BaseModel):
 
 class Entity(BaseModel):
     id: str
-    entity_type: EntityType
+    entity_type: Union[EntityType, str] = EntityType.OTHER
     brand: str
     model: str
     sku_or_upc: Optional[str] = None

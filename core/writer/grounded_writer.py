@@ -169,20 +169,30 @@ class GroundedWriter:
         5. Verifiable Source Citation Section
         """
         primary = context.primary_entity
-        brand = primary.get("brand", "Vehicle")
-        model = primary.get("model", "Model")
-        kw = context.page_plan.get("target_keyword", f"{brand} {model} Camping Guide")
+        brand = primary.get("brand", "Subject")
+        model = primary.get("model", "Equipment")
+        kw = context.page_plan.get("target_keyword", f"{brand} {model} Guide")
+
+        from core.niche_adapters.registry import NicheRegistry
+        adapter = NicheRegistry.get_active()
+
+        default_title = f"{brand} {model}: Complete Technical Specifications & Compatibility Guide"
+        title = context.page_plan.get("title") or default_title
+        if adapter and hasattr(adapter, "get_lead_summary"):
+            lead_summary = adapter.get_lead_summary(primary, model, kw)
+        else:
+            lead_summary = f"When evaluating the **{brand} {model}**, verified physical measurements and technical specifications are critical."
 
         # 1. Header & Lead
         md_lines = [
-            f"# {brand} {model}: Complete Technical Compatibility & Camping Guide",
+            f"# {title.lstrip('# ')}",
             "",
             f"> **Verified Specifications Brief**: Analysis for search query: *\"{kw}\"*. All dimensions, capacities, and runtimes are bounded by official manufacturer documentation and deterministic engineering models.",
             "",
             "> **Affiliate Disclosure**: When you buy through links on our site, we may earn an affiliate commission at no extra cost to you. All evaluations remain independent and mathematically grounded in verified specifications.",
             "",
             "## Executive Summary",
-            f"When equipping the **{brand} {model}** for overland travel and off-grid camping, accurate physical measurements and electrical power budgets are critical.",
+            lead_summary,
             ""
         ]
 
@@ -278,9 +288,12 @@ class GroundedWriter:
         trace_result = ClaimTracer.trace_and_validate(article_content, context, article_id=article_id)
 
         return {
-            "title": f"{brand} {model}: Complete Technical Compatibility & Camping Guide",
+            "title": title.lstrip("# "),
             "content": article_content,
             "trace_result": trace_result,
             "word_count": len(article_content.split()),
             "is_grounded": len(trace_result["unsupported_claims"]) == 0 and len(trace_result["forbidden_claims"]) == 0
         }
+
+    generate_draft = write_article
+    generate_article = write_article

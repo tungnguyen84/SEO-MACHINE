@@ -13,22 +13,22 @@ from core.database import get_connection
 
 
 class CompetitorType(str, Enum):
-    MANUFACTURER = "MANUFACTURER"       # OEM subaru.com, toyota.com, iceco.com
-    RETAILER = "RETAILER"               # amazon.com, rei.com, homedepot.com
-    FORUM = "FORUM"                     # subaruoutback.org, rav4world.com, bronco6g.com
-    REDDIT = "REDDIT"                   # reddit.com/r/carcamping
-    YOUTUBE = "YOUTUBE"                 # youtube.com
-    EDITORIAL = "EDITORIAL"             # caranddriver.com, motortrend.com, outdoorgearlab.com
-    AFFILIATE = "AFFILIATE"             # thin niche affiliate blogs
-    DATABASE = "DATABASE"               # edmunds.com specs, cars.com
+    MANUFACTURER = "MANUFACTURER"       # Brand / OEM official web portals
+    RETAILER = "RETAILER"               # E-commerce marketplaces and direct stores
+    FORUM = "FORUM"                     # Niche user forums and community boards
+    REDDIT = "REDDIT"                   # Community subreddits
+    YOUTUBE = "YOUTUBE"                 # Video search results
+    EDITORIAL = "EDITORIAL"             # Independent review publications
+    AFFILIATE = "AFFILIATE"             # Monetized affiliate review blogs
+    DATABASE = "DATABASE"               # Structured technical reference databases
     OTHER = "OTHER"
 
 
 class EvidenceReadiness(str, Enum):
-    READY = "READY"                     # Required vehicle and gear specs verified
-    PARTIAL = "PARTIAL"                 # Vehicle verified, specific gear or electrical pending
-    RESEARCH_REQUIRED = "RESEARCH_REQUIRED" # Key clearance or amperage data missing
-    BLOCKED = "BLOCKED"                 # No credible OEM or manufacturer source available
+    READY = "READY"                     # Required entity specifications verified
+    PARTIAL = "PARTIAL"                 # Primary entity verified, peripheral specs pending
+    RESEARCH_REQUIRED = "RESEARCH_REQUIRED" # Key technical or compatibility data missing
+    BLOCKED = "BLOCKED"                 # No credible source available
 
 
 class VolumeProvenance(str, Enum):
@@ -45,27 +45,33 @@ class SerpAnalyzer:
     """
 
     @classmethod
-    def classify_competitor(cls, url: str, domain: str, title: str) -> CompetitorType:
-        """Classifies a SERP result based on domain and page patterns."""
+    def classify_competitor(cls, url: str, domain: str, title: str, adapter: Optional[Any] = None) -> CompetitorType:
+        """Classifies a SERP result based on universal heuristics and active adapter mappings."""
         dom = domain.lower()
         t = title.lower()
 
-        if any(f in dom for f in ["subaruoutback.org", "rav4world.com", "bronco6g.com", "crvownersclub.com", "expeditionportal.com", "overlandbound.com", "tacomaworld.com"]):
-            return CompetitorType.FORUM
+        if adapter is None:
+            from core.niche_adapters.registry import NicheRegistry
+            adapter = NicheRegistry.get_active()
+
+        if adapter and hasattr(adapter, "get_known_competitors"):
+            known = adapter.get_known_competitors()
+            for k_dom, k_type in known.items():
+                if k_dom in dom:
+                    return CompetitorType(k_type)
+
         if "reddit.com" in dom:
             return CompetitorType.REDDIT
         if "youtube.com" in dom or "youtu.be" in dom:
             return CompetitorType.YOUTUBE
-        if any(m in dom for m in ["subaru.com", "toyota.com", "ford.com", "honda.com", "icecofreezer.com", "dometic.com", "bougerv.com", "ecoflow.com", "jackery.com"]):
-            return CompetitorType.MANUFACTURER
-        if any(r in dom for r in ["amazon.com", "rei.com", "walmart.com", "target.com", "homedepot.com", "basspro.com"]):
+        if any(r in dom for r in ["amazon.", "walmart.com", "target.com", "homedepot.com", "bestbuy.com", "ebay."]):
             return CompetitorType.RETAILER
-        if any(e in dom for e in ["caranddriver.com", "motortrend.com", "outdoorgearlab.com", "gearjunkie.com", "wirecutter.com", "nytimes.com/wirecutter"]):
+        if any(f in dom for f in ["forum.", "forums.", "community.", "boards.", "ownersclub.", "discussions."]):
+            return CompetitorType.FORUM
+        if any(e in dom for e in ["wirecutter.com", "nytimes.com/wirecutter", "techradar.com", "tomsguide.com", "theverge.com", "cnet.com"]):
             return CompetitorType.EDITORIAL
-        if any(d in dom for d in ["edmunds.com", "cars.com", "kbb.com"]):
+        if any(d in dom for d in ["wikipedia.org", "wiki.", "database.", "specs."]):
             return CompetitorType.DATABASE
-        if any(a in dom for a in ["campersrule.com", "overlandoutfitters.com", "carcampguide.com", "gearadviser.com"]):
-            return CompetitorType.AFFILIATE
         return CompetitorType.OTHER
 
     @classmethod

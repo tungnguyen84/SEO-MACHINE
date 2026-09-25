@@ -5,7 +5,17 @@ Parses, cleans, and standardizes engineering and product units.
 import re
 from typing import Tuple, Optional, Dict, Any
 
-class UnitNormalizer:
+class NormalizerMeta(type):
+    """Metaclass that dynamically delegates domain-specific normalization methods to registered niche adapters."""
+    def __getattr__(cls, name):
+        from core.niche_adapters.registry import NicheRegistry
+        for adapter in NicheRegistry.get_all():
+            if hasattr(adapter, name):
+                return getattr(adapter, name)
+        raise AttributeError(f"type object '{cls.__name__}' has no attribute '{name}'")
+
+
+class UnitNormalizer(metaclass=NormalizerMeta):
     """Standardizes energy, electrical, physical dimension, and capacity measurements."""
 
     @staticmethod
@@ -153,13 +163,23 @@ class UnitNormalizer:
     ) -> Dict[str, Any]:
         """
         Extracts brand, base model, variant, and version.
-        Ensures variants like 'ICECO VL45', 'ICECO VL45 Pro', 'ICECO VL45S' are
+        Ensures variants like 'Brand 45', 'Brand 45 Pro', 'Brand 45S' are
         strictly maintained as distinct entities and never falsely merged.
         """
         text = raw_name.strip()
         inferred_brand = brand
         if not inferred_brand:
-            for b in ["ICECO", "Dometic", "EcoFlow", "Jackery", "Anker", "Bluetti", "BougeRV", "Setpower", "Alpicool"]:
+            # Query known brands from registered niche adapters
+            known_brands = []
+            try:
+                from core.niche_adapters.registry import NicheRegistry
+                for ad in NicheRegistry.get_all():
+                    if hasattr(ad, "get_known_brands"):
+                        known_brands.extend(ad.get_known_brands())
+            except Exception:
+                pass
+
+            for b in known_brands:
                 if b.lower() in text.lower():
                     inferred_brand = b
                     break
@@ -173,7 +193,7 @@ class UnitNormalizer:
             variant = "ProS"
         elif re.search(r"\bpro\b", text, re.IGNORECASE):
             variant = "Pro"
-        elif re.search(r"\bvl45s\b|\b45s\b|\b[a-z0-9]+s\b", text, re.IGNORECASE) and not re.search(r"\bseries\b", text, re.IGNORECASE):
+        elif re.search(r"\b[a-z0-9]+s\b", text, re.IGNORECASE) and not re.search(r"\bseries\b", text, re.IGNORECASE):
             variant = "S"
         elif re.search(r"\bplus\b|\b\+\b", text, re.IGNORECASE):
             variant = "Plus"
@@ -216,76 +236,4 @@ class UnitNormalizer:
             "identity_status": status
         }
 
-    @classmethod
-    def normalize_vehicle_identity(
-        cls,
-        raw_name: str,
-        brand: Optional[str] = None,
-        year: Optional[int] = None,
-        trim: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Scopes vehicle identity by Year, Generation, and Trim.
-        Prevents assuming 2024 Outback == 2025 Outback or Base == Wilderness.
-        """
-        text = raw_name.strip()
-        
-        # Year
-        inferred_year = year
-        if not inferred_year:
-            y_match = re.search(r"\b(19\d{2}|20\d{2})\b", text)
-            if y_match:
-                inferred_year = int(y_match.group(1))
-
-        # Brand
-        inferred_brand = brand
-        if not inferred_brand:
-            for b in ["Subaru", "Toyota", "Ford", "Honda", "Jeep", "Chevrolet", "GMC", "Rivian", "Tesla"]:
-                if b.lower() in text.lower():
-                    inferred_brand = b
-                    break
-            if not inferred_brand:
-                inferred_brand = text.split()[0] if text else "Vehicle"
-
-        # Model
-        clean = re.sub(re.escape(inferred_brand), "", text, flags=re.IGNORECASE)
-        if inferred_year:
-            clean = re.sub(str(inferred_year), "", clean)
-        clean = clean.strip()
-
-        # Trim
-        inferred_trim = trim or "Base"
-        known_trims = ["Wilderness", "Touring", "Limited", "Premium", "Onyx", "Sport", "TRD Off-Road", "Badlands", "Trailhawk", "Base"]
-        for t in known_trims:
-            if t.lower() in text.lower():
-                inferred_trim = t
-                break
-
-        # Base Model
-        model_words = [w for w in clean.split() if w.lower() not in [t.lower() for t in known_trims]]
-        base_model = " ".join(model_words) if model_words else "Model"
-
-        # Generation mapping for target vehicles
-        generation = "Unknown"
-        if inferred_brand.lower() == "subaru" and "outback" in base_model.lower():
-            if inferred_year and 2020 <= inferred_year <= 2025:
-                generation = "Gen 6 (BT)"
-            elif inferred_year and 2015 <= inferred_year <= 2019:
-                generation = "Gen 5 (BS)"
-
-        slug_brand = inferred_brand.lower()
-        slug_model = base_model.lower().replace(" ", "_")
-        slug_year = f"_{inferred_year}" if inferred_year else "_unknown_year"
-        slug_trim = f"_{inferred_trim.lower()}" if inferred_trim != "Base" else ""
-        canonical_id = f"car_{slug_brand}_{slug_model}{slug_year}{slug_trim}"
-
-        return {
-            "canonical_id": canonical_id,
-            "brand": inferred_brand,
-            "model": base_model,
-            "year": inferred_year,
-            "generation": generation,
-            "trim": inferred_trim,
-            "is_year_scoped": inferred_year is not None,
-            "is_trim_scoped": inferred_trim != "Base"
-        }
+    normalize_product_name = normalize_product_identity

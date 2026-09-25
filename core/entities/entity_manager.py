@@ -157,14 +157,21 @@ class EntityManager:
         ent["evidence_claims"] = claims
         ent["compatibility"] = get_compatibility(entity_id)
 
-        # Calculate completeness score
-        expected_keys = {
-            EntityType.POWER_STATION.value: ["battery_capacity_wh", "inverter_continuous_watts", "inverter_surge_watts", "weight_lbs", "charge_time_ac_hours"],
-            EntityType.PORTABLE_FRIDGE.value: ["volume_liters", "power_draw_watts", "dimensions_inches", "weight_lbs", "voltage_dc"],
-            EntityType.VEHICLE.value: ["cargo_volume_cu_ft", "cargo_length_inches", "cargo_width_inches", "12v_outlet_location", "inverter_installed"]
-        }
+        # Calculate completeness score from active adapter or registered adapters
+        from core.niche_adapters.registry import NicheRegistry
+        adapter = NicheRegistry.get_active()
+        req = []
+        if adapter and hasattr(adapter, "get_required_specs"):
+            req = adapter.get_required_specs(ent.get("entity_type"))
+        if not req:
+            for ad in NicheRegistry.get_all():
+                if hasattr(ad, "get_required_specs"):
+                    req = ad.get_required_specs(ent.get("entity_type"))
+                    if req:
+                        break
+        if not req:
+            req = [a.get("attr_key") for a in ent.get("attributes", [])]
 
-        req = expected_keys.get(ent.get("entity_type"), ["weight_lbs"])
         verified_count = sum(1 for a in ent.get("attributes", []) if a["attr_key"] in req)
         completeness = round((verified_count / len(req)) * 100, 1) if req else 100.0
         ent["spec_completeness_pct"] = completeness
