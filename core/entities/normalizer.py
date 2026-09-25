@@ -132,4 +132,14 @@ class UnitNormalizer:
             num = cls.parse_volume_liters(raw_str)
             return (num, f"{num} L" if num else raw_str, "L")
 
+        if isinstance(raw_val, (int, float)):
+            num = float(raw_val)
+            unit = "in" if any(d in key for d in ["height", "length", "width", "clearance", "inches"]) else ""
+            return (num, f"{num} {unit}".strip(), unit)
+
+        if any(d in key for d in ["height", "length", "width", "clearance", "inches"]):
+            m = re.search(r"([\d\.]+)", raw_str)
+            num = float(m.group(1)) if m else None
+            return (num, f"{num} in" if num else raw_str, "in")
+
         return (None, raw_str, "")

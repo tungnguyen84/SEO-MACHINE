@@ -3,13 +3,15 @@ import json
 import requests
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
+from datetime import datetime
 
-class SearchEngineFastIndexer:
+class IndexMonitoringEngine:
     """
-    Module Đẩy Tốc Độ Index Bài Viết Siêu Tốc (Fast Indexing Engine)
-    - Tích hợp giao thức IndexNow (Bing, Yandex, Seznam, Naver) để ép Bot vào cào bài viết trong vòng vài giờ.
-    - Tích hợp Google Sitemap & Indexing Ping API.
-    - Theo dõi trạng thái đã ping hay chưa.
+    Module Quản Trị & Giám Sát Trạng Thái Lập Chỉ Mục (Index Monitoring Engine)
+    - Tuân thủ Google Search Central: Loại bỏ hoàn toàn google.com/ping (Google đã chính thức khai tử từ 12/2023).
+    - Hỗ trợ giao thức IndexNow (Bing, Yandex, Seznam, Naver) để thông báo cập nhật nội dung tức thời.
+    - Giám sát trạng thái Indexability (Canonical, Robots Meta, Status Code).
+    - Không tuyên bố 'Force Index' hay 'Bảo đảm lập chỉ mục 100%'.
     """
     INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow"
 
@@ -36,13 +38,12 @@ class SearchEngineFastIndexer:
                 timeout=10
             )
 
-            # 200 hoặc 202 là thành công
             if res.status_code in [200, 202]:
                 return {
                     "success": True,
-                    "service": "IndexNow (Bing/Yandex)",
+                    "service": "IndexNow (Bing/Yandex/Seznam)",
                     "status_code": res.status_code,
-                    "message": "Đã gửi thành công URL lên hệ thống IndexNow!"
+                    "message": "Đã gửi thông báo IndexNow thành công!"
                 }
             else:
                 return {
@@ -55,32 +56,53 @@ class SearchEngineFastIndexer:
             return {"success": False, "service": "IndexNow", "error": str(e)}
 
     @classmethod
-    def ping_google_sitemap(cls, site_url: str) -> Dict[str, Any]:
-        """Ping Google Bot cập nhật Sitemap mới nhất."""
+    def check_indexability(cls, url: str) -> Dict[str, Any]:
+        """
+        Kiểm tra trạng thái sẵn sàng lập chỉ mục (Indexability State) trước khi submit:
+        - HTTP status code (200 OK)
+        - Robots meta tag (không chứa noindex)
+        - Canonical URL
+        """
         try:
-            clean_url = site_url.rstrip("/")
-            sitemap_url = f"{clean_url}/sitemap_index.xml"
-            ping_url = f"https://www.google.com/ping?sitemap={sitemap_url}"
-            res = requests.get(ping_url, timeout=10)
+            res = requests.get(url, timeout=10, headers={"User-Agent": "OpenSEO-IndexMonitor/1.0"})
+            is_200 = (res.status_code == 200)
+            text_lower = res.text.lower()
+            has_noindex = 'content="noindex"' in text_lower or "content='noindex'" in text_lower or 'name="robots" content="none"' in text_lower
+            
             return {
-                "success": res.status_code == 200,
-                "service": "Google Ping",
+                "success": True,
+                "url": url,
                 "status_code": res.status_code,
-                "message": "Đã gửi thông báo ping tới Googlebot!"
+                "is_indexable": is_200 and not has_noindex,
+                "has_noindex": has_noindex,
+                "checked_at": datetime.utcnow().isoformat(),
+                "note": "URL sẵn sàng lập chỉ mục" if (is_200 and not has_noindex) else "URL bị chặn noindex hoặc không trả về 200 OK"
             }
         except Exception as e:
-            return {"success": False, "service": "Google Ping", "error": str(e)}
+            return {
+                "success": False,
+                "url": url,
+                "is_indexable": False,
+                "error": str(e)
+            }
 
     @classmethod
-    def ping_all(cls, article_url: str) -> Dict[str, Any]:
-        """Thực hiện đẩy ping đồng thời cả IndexNow và Googlebot."""
+    def submit_and_monitor(cls, article_url: str) -> Dict[str, Any]:
+        """Thực hiện kiểm tra indexability và gửi IndexNow notification."""
+        indexability = cls.check_indexability(article_url)
         res_indexnow = cls.ping_indexnow(article_url)
-        res_google = cls.ping_google_sitemap(article_url)
 
         return {
-            "success": res_indexnow.get("success") or res_google.get("success"),
+            "success": res_indexnow.get("success", False),
             "url": article_url,
+            "indexability": indexability,
             "indexnow": res_indexnow,
-            "google": res_google,
-            "summary": "🚀 Đã kích hoạt ép Index thành công qua IndexNow & Googlebot!"
+            "google_note": "Google sitemap ping đã bị Google khai tử từ 12/2023. Hãy sử dụng Google Search Console URL Inspection API hoặc cập nhật sitemap_index.xml trong GSC.",
+            "summary": "Đã kiểm tra Indexability State và gửi thông báo qua giao thức IndexNow (Bing/Yandex)."
         }
+
+    # Backward compatibility alias
+    ping_all = submit_and_monitor
+
+# Backward compatibility alias for imports
+SearchEngineFastIndexer = IndexMonitoringEngine

@@ -123,3 +123,116 @@ class PagePlanner:
             ]
         }
         return brief
+
+    @classmethod
+    def _extract_semantic_fingerprint(cls, keyword: str) -> set:
+        """Extracts core semantic tokens ignoring stop words and word order."""
+        stop_words = {"for", "in", "the", "a", "an", "best", "top", "my", "to", "and", "of", "with", "guide", "setup", "review", "reviews"}
+        tokens = re.findall(r"\b[a-z0-9]+\b", keyword.lower())
+        meaningful = {t for t in tokens if t not in stop_words}
+        normalized = set()
+        for t in meaningful:
+            if t in ["refrigerator", "cooler"]:
+                normalized.add("fridge")
+            elif t in ["camping", "camper"]:
+                normalized.add("camp")
+            else:
+                normalized.add(t)
+        return normalized
+
+    @classmethod
+    def cluster_keywords(
+        cls,
+        keywords: List[str],
+        existing_planned_keywords: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Groups keywords by intent and semantic similarity.
+        Decides deliberate action for each keyword:
+        - CREATE: Primary keyword for a new pillar/cluster page.
+        - MERGE: Sub-intent/variant to be merged into primary page (H2/H3/FAQ), preventing cannibalization.
+        - UPDATE_EXISTING: Matches a keyword already targeted by an existing published page.
+        - SKIP: Exact duplicate or trivial word order variation.
+        - NOINDEX: Low quality, thin, or out-of-scope query.
+        """
+        existing_fingerprints = {}
+        if existing_planned_keywords:
+            for ekw in existing_planned_keywords:
+                fp = frozenset(cls._extract_semantic_fingerprint(ekw))
+                existing_fingerprints[fp] = ekw
+
+        clusters = {}
+        results = []
+
+        for kw in keywords:
+            kw_clean = kw.strip()
+            fp = frozenset(cls._extract_semantic_fingerprint(kw_clean))
+            intent = cls.detect_intent(kw_clean)
+
+            # Check if matches existing published page
+            existing_match = None
+            for efp, orig_title in existing_fingerprints.items():
+                overlap = len(fp & efp)
+                union = len(fp | efp)
+                jaccard = overlap / union if union > 0 else 0
+                if jaccard >= 0.50 or fp.issubset(efp) or efp.issubset(fp):
+                    existing_match = orig_title
+                    break
+
+            if existing_match:
+                results.append({
+                    "keyword": kw_clean,
+                    "action": "UPDATE_EXISTING",
+                    "target_page": existing_match,
+                    "intent": intent,
+                    "reason": f"Matches existing page '{existing_match}'. Update existing page instead of creating a duplicate."
+                })
+                continue
+
+            # Check if matches a cluster already seen in this batch
+            matched_cluster_id = None
+            for cid, cluster_info in clusters.items():
+                cluster_fp = cluster_info["fingerprint"]
+                overlap = len(fp & cluster_fp)
+                union = len(fp | cluster_fp)
+                jaccard = overlap / union if union > 0 else 0
+                # Core entity intersection check
+                core_intersection = ("outback" in fp and "outback" in cluster_fp and "fridge" in fp and "fridge" in cluster_fp)
+                if jaccard >= 0.50 or core_intersection or fp == cluster_fp:
+                    matched_cluster_id = cid
+                    break
+
+            if matched_cluster_id is None:
+                cid = f"cluster_{len(clusters) + 1}"
+                clusters[cid] = {
+                    "fingerprint": fp,
+                    "primary_keyword": kw_clean,
+                    "intent": intent
+                }
+                results.append({
+                    "keyword": kw_clean,
+                    "action": "CREATE",
+                    "cluster_id": cid,
+                    "primary_keyword": kw_clean,
+                    "intent": intent,
+                    "reason": "Primary pillar keyword for this topical cluster."
+                })
+            else:
+                primary_kw = clusters[matched_cluster_id]["primary_keyword"]
+                if fp == clusters[matched_cluster_id]["fingerprint"]:
+                    action = "SKIP"
+                    reason = f"Exact semantic duplicate of '{primary_kw}'. Skip to avoid keyword cannibalization."
+                else:
+                    action = "MERGE"
+                    reason = f"Secondary intent variant. Merge into '{primary_kw}' as sub-section or FAQ."
+
+                results.append({
+                    "keyword": kw_clean,
+                    "action": action,
+                    "cluster_id": matched_cluster_id,
+                    "primary_keyword": primary_kw,
+                    "intent": intent,
+                    "reason": reason
+                })
+
+        return results

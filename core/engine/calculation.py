@@ -8,12 +8,36 @@ class CalculationEngine:
     """Scientific calculations for electrical systems, battery banks, and vehicle installations."""
 
     @staticmethod
+    def _log_calculation(calc_type: str, inputs: dict, assumptions: dict, output: dict, entity_id: Optional[str] = None):
+        try:
+            from core.database import get_connection
+            import json
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO calculation_logs (entity_id, calculation_type, inputs_json, formula_version, assumptions_json, output_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                entity_id,
+                calc_type,
+                json.dumps(inputs),
+                "v1.2-physics",
+                json.dumps(assumptions),
+                json.dumps(output)
+            ))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    @staticmethod
     def calculate_runtime(
         battery_wh: float,
         device_watts: float,
         is_ac_load: bool = True,
         inverter_efficiency: float = 0.85,
-        depth_of_discharge: float = 0.90
+        depth_of_discharge: float = 0.90,
+        entity_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Calculates standard runtime for constant loads.
@@ -26,10 +50,20 @@ class CalculationEngine:
         eff = inverter_efficiency if is_ac_load else 0.95
         usable_wh = battery_wh * depth_of_discharge * eff
         runtime_hours = usable_wh / device_watts
-
         days = runtime_hours / 24.0
 
-        return {
+        inputs = {
+            "battery_wh": battery_wh,
+            "device_watts": device_watts,
+            "is_ac_load": is_ac_load
+        }
+        assumptions = {
+            "depth_of_discharge": depth_of_discharge,
+            "inverter_efficiency": eff,
+            "voltage_decay_loss": "factored into DoD",
+            "ambient_temp_factor": "nominal 77F"
+        }
+        output = {
             "battery_nominal_wh": battery_wh,
             "device_watts": device_watts,
             "usable_wh": round(usable_wh, 1),
@@ -39,13 +73,24 @@ class CalculationEngine:
             "display_str": f"{round(runtime_hours, 1)} hours ({round(days, 1)} days)" if days >= 1.0 else f"{round(runtime_hours, 1)} hours"
         }
 
+        CalculationEngine._log_calculation("power_runtime", inputs, assumptions, output, entity_id)
+
+        return {
+            "formula_version": "v1.2-physics",
+            "inputs": inputs,
+            "assumptions": assumptions,
+            "output": output,
+            **output
+        }
+
     @staticmethod
     def calculate_fridge_runtime(
         battery_wh: float,
         fridge_rated_watts: float = 45.0,
         ambient_temp_f: float = 77.0,
         fridge_target_temp_f: float = 38.0,
-        is_dc_12v: bool = True
+        is_dc_12v: bool = True,
+        entity_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Calculates 12V compressor fridge runtime with duty cycle modeling.
@@ -68,7 +113,19 @@ class CalculationEngine:
         runtime_hours = usable_wh / avg_continuous_watts
         runtime_days = runtime_hours / 24.0
 
-        return {
+        inputs = {
+            "battery_wh": battery_wh,
+            "fridge_rated_watts": fridge_rated_watts,
+            "ambient_temp_f": ambient_temp_f,
+            "fridge_target_temp_f": fridge_target_temp_f,
+            "is_dc_12v": is_dc_12v
+        }
+        assumptions = {
+            "cooling_duty_cycle_formula": "min(0.90, max(0.15, (ambient - target)/100 * 0.70))",
+            "dc_conversion_efficiency": eff,
+            "usable_capacity_dod": 0.90
+        }
+        output = {
             "battery_nominal_wh": battery_wh,
             "fridge_rated_watts": fridge_rated_watts,
             "ambient_temp_f": ambient_temp_f,
@@ -78,6 +135,16 @@ class CalculationEngine:
             "runtime_hours": round(runtime_hours, 1),
             "runtime_days": round(runtime_days, 2),
             "display_str": f"{round(runtime_hours, 1)} hours ({round(runtime_days, 1)} days at {ambient_temp_f}°F ambient)"
+        }
+
+        CalculationEngine._log_calculation("fridge_runtime", inputs, assumptions, output, entity_id)
+
+        return {
+            "formula_version": "v1.2-physics",
+            "inputs": inputs,
+            "assumptions": assumptions,
+            "output": output,
+            **output
         }
 
     @staticmethod

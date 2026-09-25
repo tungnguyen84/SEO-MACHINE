@@ -55,7 +55,17 @@ class CompatibilityEngine:
         g_l = g_attrs.get("length_inches", {}).get("num") or 26.0
 
         clearance = v_h - g_h
-        status = "EXACT_FIT" if clearance >= 6.0 else ("TIGHT_FIT" if clearance >= 0 else "DOES_NOT_FIT")
+        electrical_ok = (v_amps * 12.0) >= (g_attrs.get("average_power_draw_watts", {}).get("num") or 45.0)
+
+        if clearance < 0:
+            status = "DOES_NOT_FIT"
+            verdict = "FAIL"
+        elif clearance < 4.0 or not electrical_ok:
+            status = "TIGHT_FIT"
+            verdict = "CONDITIONAL"
+        else:
+            status = "EXACT_FIT"
+            verdict = "PASS"
 
         detail = (
             f"The {g['brand']} {g['model']} stands {g_h}\" tall, fitting inside the {v['brand']} {v['model']}'s "
@@ -71,7 +81,7 @@ class CompatibilityEngine:
             <ul style="margin: 0; padding-left: 20px; color: #1e293b; font-size: 0.95rem;">
                 <li><strong>Vertical Clearance:</strong> {round(clearance, 1)} inches above lid (Hatch height: {v_h}\" vs Unit: {g_h}\")</li>
                 <li><strong>Electrical Match:</strong> Vehicle 12V/{v_amps}A port safely supports continuous operation.</li>
-                <li><strong>Fit Verdict:</strong> <span style="color: #047857; font-weight: 600;">{status}</span></li>
+                <li><strong>Fit Verdict:</strong> <span style="color: #047857; font-weight: 600;">{status} ({verdict})</span></li>
             </ul>
         </div>
         """
@@ -86,7 +96,14 @@ class CompatibilityEngine:
         )
 
         return {
+            "verdict": verdict,
             "compatibility_status": status,
+            "confidence": 1.0,
+            "reason": detail,
+            "evidence_references": [
+                f"{v['brand']} {v['model']} manual cargo height: {v_h} in",
+                f"{g['brand']} {g['model']} verified height: {g_h} in"
+            ],
             "fit_detail": detail,
             "max_clearance_inches": round(clearance, 1),
             "data_box_html": html.strip()

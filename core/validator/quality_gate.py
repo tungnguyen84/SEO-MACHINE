@@ -70,3 +70,64 @@ class QualityGate:
             "reasons": reasons,
             "status_badge": "PASS" if is_passed else "REJECTED"
         }
+
+    @classmethod
+    def evaluate_multi_dimensional(
+        cls,
+        title: str,
+        content: str,
+        allowed_numbers: Optional[Set[float]] = None,
+        source_coverage: float = 1.0,
+        source_authority: float = 0.90,
+        data_confidence: float = 1.0,
+        has_unique_calculated_data: bool = False,
+        cannibalization_risk: float = 0.0,
+        has_schema: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Comprehensive multi-dimensional quality gate:
+        - source_coverage, source_authority, data_confidence
+        - unique_data (deterministic calculation output)
+        - factual_consistency & affiliate_compliance
+        Word count is explicitly NOT a primary quality signal.
+        """
+        base_audit = cls.audit_content(title, content, allowed_numbers)
+        word_count = len(content.split())
+
+        # Evaluate individual signals
+        signals = {
+            "source_coverage": round(source_coverage, 2),
+            "source_authority": round(source_authority, 2),
+            "data_confidence": round(data_confidence, 2),
+            "unique_data": has_unique_calculated_data,
+            "cannibalization_risk": round(cannibalization_risk, 2),
+            "schema_quality": has_schema,
+            "factual_consistency": 1.0 if base_audit["forbidden_claims_count"] == 0 and not any("unverified" in r for r in base_audit["reasons"]) else 0.2,
+            "affiliate_compliance": not any("Missing mandatory Amazon Affiliate Disclosure" in r for r in base_audit["reasons"]),
+            "word_count": word_count
+        }
+
+        # Calculate final indexability readiness score
+        # Even with high word count, unsupported claims or fake testing claims will destroy the score
+        if not signals["factual_consistency"] or not signals["affiliate_compliance"] or base_audit["forbidden_claims_count"] > 0:
+            is_passed = False
+            index_verdict = "REJECTED_UNGROUNDED"
+            final_score = min(45.0, base_audit["quality_score"])
+        elif cannibalization_risk >= 0.70:
+            is_passed = False
+            index_verdict = "REJECTED_CANNIBALIZATION_RISK"
+            final_score = 50.0
+        else:
+            bonus = 10.0 if has_unique_calculated_data else 0.0
+            bonus += 5.0 if has_schema else 0.0
+            final_score = min(100.0, base_audit["quality_score"] * 0.85 + bonus)
+            is_passed = final_score >= cls.MIN_PASS_SCORE
+            index_verdict = "INDEX_ELIGIBLE" if is_passed else "NEEDS_REVISION"
+
+        return {
+            "is_passed": is_passed,
+            "index_verdict": index_verdict,
+            "final_score": round(final_score, 1),
+            "signals": signals,
+            "reasons": base_audit["reasons"]
+        }

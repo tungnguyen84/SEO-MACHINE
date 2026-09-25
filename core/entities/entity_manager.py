@@ -119,12 +119,18 @@ class EntityManager:
             review_count=review_count
         )
 
+    @staticmethod
+    def get_entity(entity_id: str) -> Optional[Dict[str, Any]]:
+        return get_entity(entity_id)
+
     @classmethod
     def get_entity_full(cls, entity_id: str) -> Optional[Dict[str, Any]]:
         ent = get_entity(entity_id)
         if not ent:
             return None
-        ent["claims"] = get_evidence_claims(entity_id)
+        claims = get_evidence_claims(entity_id)
+        ent["claims"] = claims
+        ent["evidence_claims"] = claims
         ent["compatibility"] = get_compatibility(entity_id)
 
         # Calculate completeness score

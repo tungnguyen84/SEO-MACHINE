@@ -35,10 +35,27 @@ class VehicleCampingAdapter(BaseNicheAdapter):
         # =====================================================================
         vehicles = [
             {
+                "id": "car_subaru_outback_2025",
+                "brand": "Subaru",
+                "model": "2025 Subaru Outback",
+                "type": "vehicle",
+                "url": "https://www.subaru.com/owners/manuals/2025-outback.html",
+                "specs": {
+                    "cargo_length_inches": ("42.8 in (75.7 in with seats folded)", 42.8, "in"),
+                    "cargo_width_inches": ("43.3 in between wheelhouses", 43.3, "in"),
+                    "cargo_height_inches": ("31.8 in", 31.8, "in"),
+                    "cargo_volume_cu_ft": ("32.6 cu ft behind rear seats", 32.6, "cu_ft"),
+                    "12v_dc_outlet_amps": ("12V / 10A (120W max) in rear cargo area", 10.0, "A"),
+                    "factory_inverter": ("No AC inverter (12V DC only)", None, "")
+                },
+                "source": "2025 Subaru Outback Owner's Manual, Section 6: Cargo & Specifications"
+            },
+            {
                 "id": "car_subaru_outback_2024",
                 "brand": "Subaru",
                 "model": "Outback (2020-2024)",
                 "type": "vehicle",
+                "url": "https://www.subaru.com/owners/manuals/2024-outback.html",
                 "specs": {
                     "cargo_length_inches": ("42.8 in (75.7 in with seats folded)", 42.8, "in"),
                     "cargo_width_inches": ("43.3 in between wheelhouses", 43.3, "in"),
@@ -54,6 +71,7 @@ class VehicleCampingAdapter(BaseNicheAdapter):
                 "brand": "Toyota",
                 "model": "RAV4 (2019-2024)",
                 "type": "vehicle",
+                "url": "https://www.toyota.com/owners/resources/warranty-owners-manuals/rav4/2024",
                 "specs": {
                     "cargo_length_inches": ("40.0 in (69.8 in seats folded)", 40.0, "in"),
                     "cargo_width_inches": ("39.4 in between wheel arches", 39.4, "in"),
@@ -69,6 +87,7 @@ class VehicleCampingAdapter(BaseNicheAdapter):
                 "brand": "Ford",
                 "model": "Bronco 4-Door (2021-2024)",
                 "type": "vehicle",
+                "url": "https://www.ford.com/support/vehicle/bronco/2024/owner-manuals/",
                 "specs": {
                     "cargo_length_inches": ("35.6 in (64.8 in seats folded)", 35.6, "in"),
                     "cargo_width_inches": ("42.9 in between wheel wells", 42.9, "in"),
@@ -90,7 +109,8 @@ class VehicleCampingAdapter(BaseNicheAdapter):
             )
             s_id = EntityManager.register_manual_source(
                 entity_id=v["id"],
-                document_title=v["source"]
+                document_title=v["source"],
+                url=v.get("url")
             )
             for k, (text_val, num_val, unit) in v["specs"].items():
                 EntityManager.add_verified_attribute(
@@ -227,6 +247,7 @@ class VehicleCampingAdapter(BaseNicheAdapter):
                 },
                 "asin": "B084PNN484",
                 "price": 899.00,
+                "url": "https://www.dometic.com/en-us/outdoor/coolers/electric-coolers/dometic-cfx3-45",
                 "source": "Dometic CFX3 Series Operating Manual"
             },
             {
@@ -235,6 +256,7 @@ class VehicleCampingAdapter(BaseNicheAdapter):
                 "model": "CR45 12V Fridge",
                 "type": "portable_fridge",
                 "image": "https://m.media-amazon.com/images/I/61+9Ew2M-7L._AC_SL1500_.jpg",
+                "url": "https://www.bougerv.com/products/12v-portable-refrigerator-45l",
                 "specs": {
                     "volume_liters": ("45 Liters (47.5 Quarts)", 45.0, "L"),
                     "dimensions_inches": ("22.4 x 12.6 x 18.3 in", None, "in"),
@@ -250,6 +272,34 @@ class VehicleCampingAdapter(BaseNicheAdapter):
                 "asin": "B089K8Q7V6",
                 "price": 289.99,
                 "source": "BougeRV CR45 Technical User Guide"
+            },
+            {
+                "id": "prod_iceco_vl45",
+                "brand": "ICECO",
+                "model": "ICECO VL45 Portable Refrigerator",
+                "type": "portable_fridge",
+                "image": "https://m.media-amazon.com/images/I/71Y12E3x4zL._AC_SL1500_.jpg",
+                "url": "https://icecofreezer.com/products/iceco-vl45-portable-fridge",
+                "specs": {
+                    "volume_liters": ("45 Liters (47.5 Quarts)", 45.0, "L"),
+                    "dimensions_inches": ("27.2 x 16.3 x 18.5 in", None, "in"),
+                    "length_inches": ("27.2 in", 27.2, "in"),
+                    "width_inches": ("16.3 in", 16.3, "in"),
+                    "height_inches": ("18.5 in", 18.5, "in"),
+                    "weight_lbs": ("49.6 lbs (22.5 kg)", 49.6, "lbs"),
+                    "average_power_draw_watts": ("45W rated power draw with SECOP compressor", 45.0, "W"),
+                    "compressor_type": ("SECOP (Danfoss) BD35F Compressor", None, ""),
+                    "temp_range_f": ("0°F to 50°F (-18°C to +10°C)", None, "°F"),
+                    "voltage_support": ("12V/24V DC and 110-240V AC", None, "")
+                },
+                "asin": "B07T488G62",
+                "price": 549.00,
+                "offers": [
+                    {"merchant": "Amazon", "external_id": "B07T488G62", "url": "https://www.amazon.com/dp/B07T488G62?tag=yourtag-20", "price": 549.00, "rating": 4.6, "reviews": 1150},
+                    {"merchant": "ICECO Direct", "external_id": "ICECO-VL45-DIRECT", "url": "https://icecofreezer.com/products/iceco-vl45-portable-fridge?ref=openseo", "price": 529.00, "rating": 4.8, "reviews": 320},
+                    {"merchant": "eBay", "external_id": "EBAY-VL45-001", "url": "https://www.ebay.com/itm/iceco-vl45?campid=123", "price": 519.00, "rating": 4.5, "reviews": 85}
+                ],
+                "source": "ICECO VL45 Official Product Datasheet & Technical Manual"
             }
         ]
 
@@ -263,7 +313,8 @@ class VehicleCampingAdapter(BaseNicheAdapter):
             )
             s_id = EntityManager.register_manual_source(
                 entity_id=f["id"],
-                document_title=f["source"]
+                document_title=f["source"],
+                url=f.get("url")
             )
             for k, (text_val, num_val, unit) in f["specs"].items():
                 EntityManager.add_verified_attribute(
@@ -274,21 +325,46 @@ class VehicleCampingAdapter(BaseNicheAdapter):
                     source_id=s_id,
                     evidence_quote=f"Manufacturer spec: {text_val}"
                 )
-            EntityManager.link_merchant(
-                entity_id=f["id"],
-                merchant_name="Amazon",
-                external_id=f["asin"],
-                affiliate_url=f"https://www.amazon.com/dp/{f['asin']}?tag=yourtag-20",
-                price=f["price"],
-                in_stock=True,
-                rating=4.5,
-                review_count=940
-            )
+            
+            # Decoupled Merchant Offers (Amazon, Direct Brand, eBay)
+            offers = f.get("offers")
+            if offers:
+                for o in offers:
+                    EntityManager.link_merchant(
+                        entity_id=f["id"],
+                        merchant_name=o["merchant"],
+                        external_id=o["external_id"],
+                        affiliate_url=o["url"],
+                        price=o["price"],
+                        in_stock=True,
+                        rating=o.get("rating", 4.5),
+                        review_count=o.get("reviews", 100)
+                    )
+            else:
+                EntityManager.link_merchant(
+                    entity_id=f["id"],
+                    merchant_name="Amazon",
+                    external_id=f["asin"],
+                    affiliate_url=f"https://www.amazon.com/dp/{f['asin']}?tag=yourtag-20",
+                    price=f["price"],
+                    in_stock=True,
+                    rating=4.5,
+                    review_count=940
+                )
             seeded_count += 1
 
         # =====================================================================
         # 4. COMPATIBILITY MATRIX MAPPING
         # =====================================================================
+        # 2025 Subaru Outback + ICECO VL45
+        upsert_compatibility(
+            subject_entity_id="car_subaru_outback_2025",
+            target_entity_id="prod_iceco_vl45",
+            compatibility_status="EXACT_FIT",
+            fit_detail="Fits upright in rear trunk area. Outback cargo clearance is 31.8 in vs ICECO VL45 height 18.5 in, leaving 13.3 in vertical lid clearance. 12V 10A (120W max) cargo port safely powers 45W SECOP compressor.",
+            max_clearance_inches=13.3,
+            tested_method="CALCULATED_DIMENSION"
+        )
         # Subaru Outback + Dometic CFX3 45
         upsert_compatibility(
             subject_entity_id="car_subaru_outback_2024",

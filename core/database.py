@@ -296,6 +296,126 @@ def init_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_merchant_entity ON merchant_offers(entity_id, merchant_name)")
 
+    # 19. Bảng Định Nghĩa Thuộc Tính Chuẩn (Attribute Definitions)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS attribute_definitions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attr_key VARCHAR(64) UNIQUE NOT NULL,
+        display_name VARCHAR(128) NOT NULL,
+        data_type VARCHAR(16) DEFAULT 'numeric', -- 'numeric', 'text', 'boolean'
+        default_unit VARCHAR(16),
+        description TEXT
+    )
+    """)
+
+    # 20. Bảng Quan Hệ Thực Thể (Entity Relationships)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS entity_relationships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id VARCHAR(64) NOT NULL,
+        predicate VARCHAR(64) NOT NULL, -- 'fits_in', 'powers', 'compatible_with'
+        object_id VARCHAR(64) NOT NULL,
+        confidence REAL DEFAULT 1.0,
+        source_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(subject_id) REFERENCES entities(id) ON DELETE CASCADE,
+        FOREIGN KEY(object_id) REFERENCES entities(id) ON DELETE CASCADE,
+        FOREIGN KEY(source_id) REFERENCES sources(id)
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_subj_obj ON entity_relationships(subject_id, object_id)")
+
+    # 21. Bảng Nhật Ký Tính Toán Vật Lý (Deterministic Calculation Logs)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS calculation_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_id VARCHAR(64),
+        calculation_type VARCHAR(64) NOT NULL, -- 'power_runtime', 'fridge_runtime', 'cargo_fitment'
+        inputs_json TEXT NOT NULL,
+        formula_version VARCHAR(16) DEFAULT 'v1.0',
+        assumptions_json TEXT NOT NULL,
+        output_json TEXT NOT NULL,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # 22. Bảng Kế Hoạch Trang & Intent Clustering (Page Plans)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS page_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id INTEGER DEFAULT 1,
+        target_keyword TEXT NOT NULL,
+        intent_type VARCHAR(32) NOT NULL, -- 'informational', 'commercial', 'navigational'
+        cluster_id VARCHAR(64),
+        plan_action VARCHAR(32) DEFAULT 'CREATE', -- 'CREATE', 'MERGE', 'UPDATE_EXISTING', 'NOINDEX', 'SKIP'
+        target_entity_ids TEXT,
+        factual_brief_json TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # 23. Bảng Đánh Giá Chất Lượng Trang (Page Quality Evaluations)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS page_quality_evaluations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_plan_id INTEGER,
+        article_id INTEGER,
+        overall_score REAL NOT NULL,
+        status VARCHAR(16) NOT NULL, -- 'PASSED', 'REJECTED', 'NEEDS_REVIEW'
+        quality_breakdown_json TEXT NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(page_plan_id) REFERENCES page_plans(id),
+        FOREIGN KEY(article_id) REFERENCES articles(id)
+    )
+    """)
+
+    # 24. Bảng Xác Thực Luận Điểm Dẫn Chứng (Claim Validations)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS claim_validations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_id INTEGER,
+        claim_text TEXT NOT NULL,
+        validation_status VARCHAR(16) NOT NULL, -- 'VERIFIED', 'UNSUPPORTED', 'CONFLICT', 'FORBIDDEN'
+        matched_attribute_id INTEGER,
+        reason TEXT,
+        validated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(article_id) REFERENCES articles(id),
+        FOREIGN KEY(matched_attribute_id) REFERENCES entity_attributes(id)
+    )
+    """)
+
+    # 25. Bảng Dữ Liệu Google Search Console (GSC Metrics)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gsc_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id INTEGER DEFAULT 1,
+        page_url TEXT NOT NULL,
+        query TEXT NOT NULL,
+        impressions INTEGER DEFAULT 0,
+        clicks INTEGER DEFAULT 0,
+        ctr REAL DEFAULT 0.0,
+        position REAL DEFAULT 0.0,
+        recorded_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_gsc_url_query ON gsc_metrics(page_url, query)")
+
+    # 26. Bảng Nhật Ký Kiểm Toán Toàn Hệ Thống (Audit Logs)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id INTEGER DEFAULT 1,
+        action VARCHAR(64) NOT NULL,
+        entity_type VARCHAR(32),
+        entity_id VARCHAR(64),
+        actor VARCHAR(64) DEFAULT 'system',
+        details_json TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action, entity_id)")
+
 
     # Tự động migrate thêm cột nếu bảng đã tồn tại từ trước
     for col, tbl in [("workspace_id", "articles"), ("site_id", "articles"), ("workspace_id", "rank_history")]:

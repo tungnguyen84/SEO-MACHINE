@@ -44,8 +44,11 @@ class ClaimValidator:
         if not content:
             return {"unsupported_metrics": [], "valid_metrics_count": 0}
 
+        # Clean thousands separators like 1,000 to 1000
+        content_clean = re.sub(r"(\d),(\d)", r"\1\2", content)
+
         # Find numbers with electrical/physical units
-        found_metrics = re.findall(r"([\d\.]+)\s*(?:wh|watt|watts|w|lbs|lb|kg|inches|in|\"|cu\s*ft)\b", content, re.IGNORECASE)
+        found_metrics = re.findall(r"([\d\.]+)\s*(?:wh|watt|watts|w|lbs|lb|kg|inches|in|\"|cu\s*ft)\b", content_clean, re.IGNORECASE)
         unsupported = []
         valid_count = 0
 
@@ -67,3 +70,34 @@ class ClaimValidator:
             "unsupported_metrics": list(set(unsupported)),
             "valid_metrics_count": valid_count
         }
+
+    @classmethod
+    def check_source_conflict(cls, val_a: Any, val_b: Any, tolerance: float = 0.05) -> Dict[str, Any]:
+        """
+        Detects discrepancies between multiple authoritative sources.
+        Rule 10: Never arbitrarily select a value when authoritative sources conflict.
+        """
+        try:
+            num_a = float(val_a)
+            num_b = float(val_b)
+            if max(num_a, num_b) == 0:
+                diff_ratio = 0.0
+            else:
+                diff_ratio = abs(num_a - num_b) / max(num_a, num_b)
+            
+            if diff_ratio > tolerance:
+                return {
+                    "has_conflict": True,
+                    "status": "DATA_CONFLICT",
+                    "action": "REVIEW",
+                    "reason": f"Discrepancy detected: Source A ({num_a}) vs Source B ({num_b}) exceeds {int(tolerance*100)}% tolerance. Flagged for review."
+                }
+        except (ValueError, TypeError):
+            if str(val_a).strip().lower() != str(val_b).strip().lower():
+                return {
+                    "has_conflict": True,
+                    "status": "DATA_CONFLICT",
+                    "action": "REVIEW",
+                    "reason": f"Text value conflict: '{val_a}' vs '{val_b}'. Flagged for review."
+                }
+        return {"has_conflict": False, "status": "VERIFIED"}
