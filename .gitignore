@@ -1,0 +1,41 @@
+# Environment secrets & credentials
+.env
+.env.*
+!.env.example
+
+# SQLite Database & local storage
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/cache_video/
+*.db
+*.sqlite3
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Output generated media & logs
+output/*
+!output/.gitkeep
+*.log
+*.mp4
+*.mp3
+*.wav
+
+# Executables & binary utilities
+cloudflared.exe
+*.exe
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
