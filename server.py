@@ -292,11 +292,25 @@ async def serve_dashboard(tab_name: str = ""):
 
 @app.get("/go/{slug}")
 async def redirect_cloaked_link(slug: str, request: Request):
-    """Bắt link bọc /go/slug, đếm số lượt click, ghi analytics và chuyển hướng 307 an toàn."""
+    """Bắt link bọc /go/slug, đếm số lượt click, ghi attribution pipeline và chuyển hướng 307 an toàn."""
     client_ip = request.client.host if request.client else "unknown"
     referer = request.headers.get("referer", "")
     user_agent = request.headers.get("user-agent", "")
-    destination = LinkCloaker.resolve_and_record_click(slug, client_ip=client_ip, referer=referer, user_agent=user_agent)
+    gsc_query = request.query_params.get("q") or request.query_params.get("gsc_query") or ""
+    landing_page = request.query_params.get("landing_page") or referer
+    entity_id = request.query_params.get("entity_id") or ""
+    merchant = request.query_params.get("merchant") or "amazon"
+
+    destination = LinkCloaker.resolve_and_record_click(
+        slug=slug,
+        client_ip=client_ip,
+        referer=referer,
+        user_agent=user_agent,
+        gsc_query=gsc_query,
+        landing_page_url=landing_page,
+        entity_id=entity_id,
+        merchant_name=merchant
+    )
     if not destination:
         raise HTTPException(status_code=404, detail="Link affiliate không tồn tại hoặc đã hết hạn")
     return RedirectResponse(url=destination, status_code=307)

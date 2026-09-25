@@ -88,33 +88,37 @@ class AmazonReviewSentimentMiner:
                         else:
                             praises.append(b_text[:90])
         except Exception as e:
-            print(f"[SentimentMiner] Lỗi cào review thực tế: {e}")
+            print(f"[SentimentMiner] Lỗi trích xuất review từ web: {e}")
 
-        # Fallback dữ liệu phân tích thông minh chuẩn E-E-A-T nếu bị Amazon chặn request
-        if not complaints:
-            complaints = [
-                "Lắp ráp ban đầu mất khoảng 35-45 phút, cần hướng dẫn chi tiết hơn về các khớp nối.",
-                "Trọng lượng hơi nặng nếu phải di chuyển thường xuyên giữa các phòng làm việc.",
-                "Lớp đệm hơi cứng trong 3-5 ngày đầu tiên trước khi vào form êm ái."
-            ]
-        if not praises:
-            praises = [
-                "Hỗ trợ cột sống thắt lưng (Lumbar Support) cực kỳ ấn tượng, giảm đau lưng rõ rệt sau 8h ngồi.",
-                "Chất liệu lưới thoáng khí, không bị bí nóng vào mùa hè.",
-                "Khung kim loại gia cố chắc chắn, không bị rung lắc hay phát ra tiếng kêu cọt kẹt."
-            ]
-        if not quotes:
-            quotes = [
-                "\"After using this daily for 4 months, my posture has genuinely improved. The lumbar cushion is unmatched.\" — Verified Owner",
-                "\"Heavy build, but definitely worth the price tag compared to cheaper office chairs.\" — Verified Buyer"
-            ]
+        # KHÔNG DÙNG DỮ LIỆU GIẢ: Nếu không cào được, tra cứu từ evidence_claims trong Database
+        provenance = "REAL_SCRAPED" if (complaints or praises or quotes) else "SOURCE_UNAVAILABLE"
+        
+        if not complaints and not praises:
+            # Tra cứu từ bảng evidence_claims trong DB nếu có
+            try:
+                cursor.execute("""
+                SELECT ec.extracted_value, ec.raw_quote, ec.attribute_key 
+                FROM evidence_claims ec
+                JOIN merchant_offers mo ON ec.entity_id = mo.entity_id
+                WHERE mo.external_id = ?
+                LIMIT 5
+                """, (asin,))
+                db_claims = cursor.fetchall()
+                if db_claims:
+                    provenance = "VERIFIED_MANUAL_EVIDENCE"
+                    for row in db_claims:
+                        praises.append(f"Thông số xác minh ({row['attribute_key']}): {row['extracted_value']}")
+                        quotes.append(f"\"{row['raw_quote']}\"")
+            except Exception:
+                pass
 
-        # Lưu vào Cache
-        cursor.execute("""
-        INSERT OR REPLACE INTO sentiment_cache (asin, product_name, complaints_json, praises_json, verified_quotes_json, rating)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (asin, product_title or f"Product {asin}", json.dumps(complaints), json.dumps(praises), json.dumps(quotes), rating))
-        conn.commit()
+        # Lưu vào Cache nếu có dữ liệu thật
+        if complaints or praises:
+            cursor.execute("""
+            INSERT OR REPLACE INTO sentiment_cache (asin, product_name, complaints_json, praises_json, verified_quotes_json, rating)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (asin, product_title or f"Product {asin}", json.dumps(complaints), json.dumps(praises), json.dumps(quotes), rating))
+            conn.commit()
         conn.close()
 
         return {
@@ -131,6 +135,8 @@ class AmazonReviewSentimentMiner:
             ],
             "rating": rating,
             "sentiment_score": round(max(0.65, min(0.95, rating / 5.0)), 2),
-            "total_reviews_analyzed": len(praises) + len(complaints) + len(quotes) + 45,
+            "total_reviews_analyzed": len(praises) + len(complaints) + len(quotes),
+            "provenance": provenance,
+            "compliance_note": "Aggregated user telemetry for sentiment distribution. Not claimed as laboratory test.",
             "is_cached": False
         }

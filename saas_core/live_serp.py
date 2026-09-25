@@ -291,26 +291,47 @@ class LiveSerpEngine:
                 "google_search_url": f"https://www.google.com/search?q={urllib.parse.quote_plus(kw)}&gl=us&pws=0&hl=en"
             }
 
-        # Đánh giá cơ hội outrank thực tế
-        if forum_count >= 1 or niche_count >= 1:
-            verdict = "CƠ HỘI VÀNG (DỄ DÀNG LÊN TOP 1-3): XUẤT HIỆN DIỄN ĐÀN (REDDIT) / WEBSITE NGÁCH TRONG TOP 10"
-            outrank_chance = "90% - 95% (Cực Dễ Vượt)"
+        # Đánh giá SERP Opportunity Score và breakdown thay vì tuyên bố outrank tuyệt đối
+        score = 50
+        breakdown = []
+
+        if forum_count >= 1:
+            score += 25
+            breakdown.append(f"+25: Xuất hiện {forum_count} kết quả diễn đàn (Reddit/Quora) trong Top 10 (SERP Intent Gap)")
+        if niche_count >= 1:
+            score += 15
+            breakdown.append(f"+15: Có {niche_count} website ngách đang rank Top 10 (Khả thi cho affiliate site)")
+        if zero_bl_count >= 1:
+            score += 15
+            breakdown.append(f"+15: Có {zero_bl_count} trang ít hoặc không có backlink vẫn lọt Top")
+        if ecommerce_count >= 2:
+            score += 15
+            breakdown.append(f"+15: Có {ecommerce_count} trang sàn TMĐT (Người dùng tìm kiếm đánh giá/thông số)")
+        if mega_count >= 4:
+            score -= 20
+            breakdown.append(f"-20: Có {mega_count} trang đại báo/cơ quan truyền thông lớn (DA > 80)")
+
+        score = max(20, min(95, score))
+
+        if score >= 80:
+            verdict = "CƠ HỘI CAO (SERP OPPORTUNITY: CAO): XUẤT HIỆN DIỄN ĐÀN HOẶC GAP NỘI DUNG RÕ RÀNG"
+            opportunity_label = f"{score}/100 (Cơ Hội Cao)"
             strategy = (
-                f"1. Có {forum_count} kết quả Diễn đàn (Reddit/Quora) và {niche_count} website ngách trong Top 10 thật trên Google US.\n"
-                "2. Các trang diễn đàn này chỉ là thảo luận ngắn, hoàn toàn thiếu cấu trúc bài viết chuyên gia, bảng so sánh và FAQ Schema.\n"
-                "3. Xuất bản bài viết 2,000+ từ chuẩn OpenSEO, chèn 3-5 sản phẩm Amazon đánh giá chi tiết sẽ chiếm trọn vị trí của các bài thảo luận này!"
+                f"1. Top 10 có {forum_count} diễn đàn và {zero_bl_count} trang ít backlink.\n"
+                "2. Các kết quả thảo luận cộng đồng còn thiếu bảng đối chiếu thông số thực tế và dữ liệu fitment đo đạc.\n"
+                "3. Xuất bản bài viết phân tích thực tế kèm dữ liệu bằng chứng và structured schema để đáp ứng trực diện intent người dùng."
             )
-        elif ecommerce_count >= 3:
-            verdict = "CƠ HỘI TỐT: TOP 10 BỊ CHIẾM BỞI TRANG BÁN HÀNG CỦA SÀN (AMAZON/EBAY/WALMART)"
-            outrank_chance = "80% - 85% (Dễ Lên Top)"
+        elif score >= 60:
+            verdict = "CƠ HỘI TRUNG BÌNH - KHẢ THI: NHIỀU SÀN TMĐT VÀ THIẾU BÀI SO SÁNH CHUYÊN SÂU"
+            opportunity_label = f"{score}/100 (Khả Thi)"
             strategy = (
-                "Google đang phải xếp hạng trang danh mục sản phẩm vì thiếu bài viết phân tích chuyên sâu (Informational/Review).\n"
-                "Người dùng gõ từ khóa này cần lời khuyên chuyên gia thay vì chỉ nhìn danh sách sản phẩm. Hãy làm bài review chi tiết để Google ưu tiên đưa lên trước sàn!"
+                "Google đang xếp hạng trang danh mục sản phẩm do thiếu bài viết phân tích thực tế.\n"
+                "Người dùng cần tư vấn fitment và tính toán công suất thay vì chỉ xem catalog. Cung cấp dữ liệu đo đạc chính xác để chiếm vị trí."
             )
         else:
-            verdict = "CẠNH TRANH TRUNG BÌNH: NHIỀU BÁO LỚN VÀ KÊNH TRUYỀN THÔNG"
-            outrank_chance = "70% - 75% (Cần Tối Ưu E-E-A-T)"
-            strategy = "Cần đầu tư bài viết dài, chèn bảng thông số kỹ thuật chi tiết, video nhúng và internal link chặt chẽ từ các bài vệ tinh."
+            verdict = "CẠNH TRANH ĐÁNG KỂ: NHIỀU THỰC THỂ LỚN VÀ BÁO CHÍ DA CAO"
+            opportunity_label = f"{score}/100 (Cần Entity Authority)"
+            strategy = "Cần xây dựng cụm Topical Cluster đầy đủ, bổ sung entity attributes verified và liên kết nội bộ chặt chẽ."
 
         return {
             "keyword": kw,
@@ -319,7 +340,9 @@ class LiveSerpEngine:
             "source_label": "Google US Real-time Live SERP (100% Thời Gian Thực)",
             "google_search_url": f"https://www.google.com/search?q={urllib.parse.quote_plus(kw)}&gl=us&pws=0&hl=en",
             "verdict": verdict,
-            "outrank_probability": outrank_chance,
+            "serp_opportunity_score": score,
+            "score_breakdown": breakdown,
+            "outrank_probability": opportunity_label,
             "strategy": strategy,
             "zero_backlink_niche_count": zero_bl_count,
             "ecommerce_count": ecommerce_count,

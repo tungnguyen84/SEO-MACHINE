@@ -582,9 +582,10 @@ class DiamondNicheHunter:
         all_diamonds.sort(key=lambda x: x["diamond_score"], reverse=True)
 
         # ============================================================
-        # 3. LẬP LỊCH TỰ ĐỘNG THEO SỐ NGÀY YÊU CẦU (PLAN_DAYS)
-        # TUÂN THỦ NGHIÊM NGẶT TỶ LỆ VÀNG CHUẨN GOOGLE HCU:
-        # 1 Bài Affiliate (Mua hàng) : 2 Bài Informational / Visual Specs (Hỗ trợ)
+        # 3. LẬP LỊCH THEO Ý ĐỊNH TÌM KIẾM & ĐỘ PHỦ THỰC THỂ (INTENT & USER JOURNEY)
+        # KHÔNG ÁP DỤNG TỶ LỆ CỐ ĐỊNH "1:2".
+        # Phân bổ theo hành trình tìm kiếm và độ phủ thực thể:
+        # Awareness (How-To/Calculations) → Consideration (VS / Roundups) → Decision (Single Reviews)
         # ============================================================
         now = datetime.now()
         schedule_items = []
@@ -594,23 +595,11 @@ class DiamondNicheHunter:
         vs_pool = [k for k in review_diamonds if k.get("type") == "vs"] or review_diamonds[:5]
         info_pool = info_diamonds if info_diamonds else all_diamonds[:10]
 
-        # Lập kế hoạch chính xác theo tỷ lệ vàng (Cứ mỗi 3 ngày: 1 Affiliate, 2 Informational)
-        # Các ngày Affiliate cố định: Ngày 1 (Roundup), Ngày 4 (VS), Ngày 8 (Roundup), Ngày 11 (Review), Ngày 15 (Roundup), Ngày 18 (VS), Ngày 22 (Roundup), Ngày 25 (Review), Ngày 28 (VS), Ngày 30 (Review)
-        affiliate_schedule_map = {
-            1: "roundup",
-            4: "vs",
-            8: "roundup",
-            11: "single",
-            15: "roundup",
-            18: "vs",
-            22: "roundup",
-            25: "single",
-            28: "vs",
-            30: "single"
-        }
-
         # Tạo danh sách 3-5 sản phẩm cho bài Roundup
         roundup_prods = products_list[:5] if len(products_list) >= 5 else (products_list + products_list)[:5]
+
+        # Phân bổ nội dung xoay vòng tự nhiên theo hành trình người dùng
+        journey_pattern = ["roundup", "how_to", "vs", "infographic", "single", "how_to"]
 
         r_idx = 0
         s_idx = 0
@@ -621,23 +610,15 @@ class DiamondNicheHunter:
             publish_dt = now + timedelta(days=day)
             publish_date_str = publish_dt.strftime("%Y-%m-%dT08:30:00")
             
-            # Kiểm tra xem ngày này là Affiliate hay Informational theo chu kỳ 1 Aff : 2 Info
-            is_aff_day = False
-            art_type = "how_to"
-
-            if day in affiliate_schedule_map:
-                is_aff_day = True
-                art_type = affiliate_schedule_map[day]
-            elif day > 30 and (day % 3 == 1):
-                is_aff_day = True
-                art_type = "roundup" if (day % 6 == 1) else "single"
+            art_type = journey_pattern[(day - 1) % len(journey_pattern)]
+            is_aff_day = art_type in ["roundup", "single", "vs"]
 
             if is_aff_day:
                 if art_type == "roundup":
                     kw_item = roundups_pool[r_idx % len(roundups_pool)]
                     r_idx += 1
                     clean_kw_name = re.sub(r'\bin 2026\b', '', kw_item['keyword'], flags=re.I).replace('best ', '').strip().title()
-                    title = f"The Best {clean_kw_name} in 2026: Tested & Reviewed"
+                    title = f"The Best {clean_kw_name} in 2026: Data-Driven Buyer's Guide & Spec Comparison"
                     # Đính kèm 3-5 sản phẩm được đánh giá trong bài Best Roundup
                     selected_roundup = roundup_prods[:min(5, max(3, len(roundup_prods)))]
                     asins = [p["asin"] for p in selected_roundup]
@@ -830,38 +811,64 @@ class DiamondNicheHunter:
         exact_title_count = sum(1 for r in sample_serp if r.get("exact_title_match", False))
         zero_backlink_niches = sum(1 for r in sample_serp if r["type"] == "niche" and r.get("backlinks", 0) <= 1)
 
-        # Tính toán khả năng vượt lên dựa trên Backlinks và On-Page của đối thủ
-        if is_generic_head or mega_count >= 6:
-            outrank_chance = "15% - 25% (Rất Khó)"
-            verdict = "🛑 CẠNH TRANH CỰC CAO - ĐỐI THỦ HÀNG TRĂM BACKLINK"
+        # Tính toán SERP Opportunity Score dựa trên Content Gap & Backlink Gap của Top 10
+        score_breakdown = []
+        base_score = 50
+
+        if zero_backlink_niches >= 1:
+            bonus = min(30, zero_backlink_niches * 15)
+            base_score += bonus
+            score_breakdown.append(f"+{bonus} điểm: Xuất hiện {zero_backlink_niches} website ngách chỉ có 0-1 Backlink trong Top 10")
+
+        if forum_count >= 1:
+            base_score += 15
+            score_breakdown.append(f"+15 điểm: Xuất hiện diễn đàn thảo luận ({forum_count} Reddit/Forum), cho thấy thiếu hụt bài viết chuyên sâu có cấu trúc")
+
+        if exact_title_count <= 4:
+            bonus = 15
+            base_score += bonus
+            score_breakdown.append(f"+{bonus} điểm: Chỉ có {exact_title_count}/10 đối thủ tối ưu đúng từ khóa chính trong Tiêu Đề")
+
+        if mega_count >= 6:
+            base_score -= 30
+            score_breakdown.append("-30 điểm: Top 10 bị chiếm đóng dày đặc bởi các báo lớn DA > 80")
+
+        if ecommerce_count >= 5:
+            base_score -= 15
+            score_breakdown.append("-15 điểm: Ý định tìm kiếm thiên nặng về trang danh mục sản phẩm sàn TMĐT")
+
+        final_opp_score = max(10, min(95, base_score))
+
+        if final_opp_score >= 80:
+            opp_badge = f"{final_opp_score}/100 (Cơ Hội Rất Cao - High Opportunity)"
+            verdict = "💎 CƠ HỘI LỚN: TỒN TẠI KHOẢNG TRỐNG NỘI DUNG & ĐỐI THỦ BACKLINK YẾU"
             strategy = (
-                f"Top 10 bị chiếm đóng bởi các sàn TMĐT khổng lồ (Amazon, eBay) và các trang báo lớn (DA > 80) "
-                f"với hàng trăm Backlink trỏ về URL. Website mới lập không thể cạnh tranh về Domain Rating ở từ khóa này.\n"
-                "👉 KHUYẾN NGHỊ: Không viết bài mục tiêu cho từ khóa này. Chỉ dùng làm tên danh mục (Category) hoặc Anchor text điều hướng."
+                f"Phân tích cơ hội SERP [MODELLED]:\n"
+                f"- Có {zero_backlink_niches} trang ngách trong Top 10 với lượng backlink gần như bằng 0.\n"
+                f"- Đa số kết quả hiện tại là trang danh mục sàn hoặc thảo luận diễn đàn rời rạc.\n"
+                f"👉 CHIẾN LƯỢC ĐỀ XUẤT:\n"
+                f"- Xây dựng bài viết chuẩn cấu trúc với bảng thông số so sánh và dữ liệu kiểm chứng.\n"
+                f"- Tối ưu hóa On-Page chuẩn xác và liên kết nội bộ theo cụm chủ đề liên quan."
             )
-        elif zero_backlink_niches >= 1 or forum_count >= 1:
-            outrank_chance = "90% - 95% (Cực Dễ Vượt - Cơ Hội Vàng)"
-            verdict = f"💎 KIM CƯƠNG: ĐỐI THỦ CHỈ CÓ 0 - 1 BACKLINK & XUẤT HIỆN DIỄN ĐÀN"
+        elif final_opp_score >= 55:
+            opp_badge = f"{final_opp_score}/100 (Cơ Hội Trung Bình - Moderate Opportunity)"
+            verdict = "⭐ CƠ HỘI KHẢ THI: CẦN NỘI DUNG CHẤT LƯỢNG CAO & ĐỘ PHỦ TOPICAL"
             strategy = (
-                f"Phát hiện yếu điểm then chốt của SERP:\n"
-                f"1. Có {zero_backlink_niches} website ngách trong Top 10 chỉ có 0 đến 1 Backlink nhưng vẫn đứng Top vì ngách này quá ít người làm.\n"
-                f"2. Chỉ có {exact_title_count}/10 trang đặt đúng từ khóa trong Tiêu đề. Các vị trí còn lại là sàn Amazon và YouTube (chỉ hiển thị theo ý định mua hàng, thiếu nội dung chuyên sâu).\n"
-                f"👉 CHIẾN LƯỢC ĐÁNH BẠI:\n"
-                f"- Viết bài dài từ 1,800 - 2,500 từ đặt chuẩn từ khóa chính trong thẻ H1 và URL.\n"
-                f"- Chèn bảng so sánh thông số 3-5 sản phẩm + FAQ Schema bằng OpenSEO.\n"
-                f"- Bạn hoàn toàn có thể vào Top 3 mà KHÔNG CẦN mua bất kỳ backlink nào!"
+                f"SERP có sự cạnh tranh vừa phải giữa các trang ngách và trang bán hàng.\n"
+                f"👉 CHIẾN LƯỢC ĐỀ XUẤT: Tập trung giải quyết trực tiếp ý định người tìm kiếm (Answer-First), bổ sung công thức tính toán và bảng dữ liệu chuyên biệt."
             )
         else:
-            outrank_chance = "70% - 80% (Khả Thi Cao)"
-            verdict = "⭐ GOLDEN LONGTAIL: ĐỐI THỦ YẾU VỀ ON-PAGE"
+            opp_badge = f"{final_opp_score}/100 (Cơ Hội Thấp - Low Opportunity)"
+            verdict = "🛑 CẠNH TRANH RẤT CAO: CHIẾM ĐÓNG BỞI CÁC THƯƠNG HIỆU LỚN"
             strategy = (
-                f"Chỉ có {niche_count} website ngách đã làm bài viết về từ khóa này với lượng backlink rất khiêm tốn.\n"
-                f"👉 CHIẾN LƯỢC: Tối ưu nội dung tươi mới cho năm 2026, bổ sung 2 bài viết How-To vệ tinh trỏ liên kết nội bộ (Topical Authority) là có thể vượt qua đối thủ sau 30-45 ngày."
+                f"Top 10 có sự hiện diện của các tổ chức có DA > 80 và hàng trăm liên kết trỏ về.\n"
+                f"👉 KHUYẾN NGHỊ: Không nên nhắm mục tiêu trực diện từ khóa này cho trang độc lập mới. Hãy dùng làm chủ đề cha hoặc từ khóa danh mục."
             )
 
         return {
             "success": True,
             "keyword": kw,
+            "provenance": "MODELLED_SERP_HEURISTIC",
             "total_competitors_analyzed": len(sample_serp),
             "ecommerce_count": ecommerce_count,
             "video_count": video_count,
@@ -870,7 +877,9 @@ class DiamondNicheHunter:
             "niche_sites_count": niche_count,
             "exact_title_match_count": exact_title_count,
             "zero_backlink_niche_count": zero_backlink_niches,
-            "outrank_probability": outrank_chance,
+            "serp_opportunity_score": opp_badge,
+            "opportunity_score_num": final_opp_score,
+            "score_breakdown": score_breakdown,
             "verdict": verdict,
             "strategy": strategy,
             "top_10": sample_serp
