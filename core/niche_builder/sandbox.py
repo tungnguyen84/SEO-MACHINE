@@ -100,7 +100,7 @@ class NicheSandbox:
                 for attr_spec in spec.attributes.get(et, []):
                     # Generate believable synthetic numbers/strings
                     if attr_spec.data_type in ("INTEGER", "FLOAT", "POWER", "ENERGY", "DIMENSION", "MONEY", "PERCENTAGE"):
-                        val = 50.0 * i if "cadr" in attr_spec.key or "sqft" in attr_spec.key else (15.0 * i)
+                        val = 50.0 * i if attr_spec.data_type in ("DIMENSION", "POWER", "ENERGY") else (15.0 * i)
                         attrs[attr_spec.key] = {"num": val, "text": f"{val} {attr_spec.unit or ''}".strip(), "unit": attr_spec.unit}
                     elif attr_spec.data_type == "BOOLEAN":
                         attrs[attr_spec.key] = {"num": 1.0, "text": "True"}

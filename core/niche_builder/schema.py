@@ -98,6 +98,16 @@ class ConditionSpec(BaseModel):
     tolerance: float = 0.0
 
 
+class ProvenanceType(str, Enum):
+    """Allowed provenance classes for calculations and rules."""
+    OFFICIAL_STANDARD = "OFFICIAL_STANDARD"
+    MANUFACTURER = "MANUFACTURER"
+    INDEPENDENT = "INDEPENDENT"
+    DERIVED = "DERIVED"
+    USER_DEFINED = "USER_DEFINED"
+    MODEL_PROPOSED = "MODEL_PROPOSED"
+
+
 class CompatibilityRuleSpec(BaseModel):
     """Visual no-code compatibility rule specification."""
     rule_id: str
@@ -112,6 +122,10 @@ class CompatibilityRuleSpec(BaseModel):
     fail_status: str = "DOES_NOT_FIT"
     explanation_pass: str = "Verified compatible fitment."
     explanation_fail: str = "Physical or operational specifications do not match."
+    provenance_type: str = "MODEL_PROPOSED"
+    source_ids: List[str] = Field(default_factory=list)
+    confidence: float = 0.70
+    assumptions: List[str] = Field(default_factory=list)
 
 
 class CalculationSpec(BaseModel):
@@ -123,6 +137,11 @@ class CalculationSpec(BaseModel):
     output_description: str = ""
     required_variables: List[str] = Field(default_factory=list)
     display_template: Optional[str] = None
+    provenance_type: str = "MODEL_PROPOSED"
+    source_ids: List[str] = Field(default_factory=list)
+    confidence: float = 0.70
+    assumptions: List[str] = Field(default_factory=list)
+    version: str = "1.0.0"
 
 
 class SourcePolicySpec(BaseModel):
@@ -192,6 +211,8 @@ class NicheSpec(BaseModel):
     domain_stop_words: List[str] = Field(default_factory=lambda: ["guide", "review", "best", "top", "for", "vs"])
     cluster_differentiators: List[str] = Field(default_factory=list)
     known_competitors: Dict[str, str] = Field(default_factory=dict)
+    freshness_rules: List[Dict[str, Any]] = Field(default_factory=list)
+    monetization_types: List[str] = Field(default_factory=lambda: ["affiliate_commerce", "display_ads"])
     version_history: List[NicheVersionSpec] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

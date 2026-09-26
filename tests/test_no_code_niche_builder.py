@@ -53,12 +53,16 @@ def test_air_purifier_no_code_pipeline():
     and compatibility rules completely declaratively.
     Must validate, execute safe formulas, evaluate compatibility, and PASS sandbox dry-run.
     """
-    draft = AINicheDesigner.design_from_prompt(
-        "Design a high-authority air purifiers and clean air website with CADR room sizing, filter replacements, and electricity costs."
+    spec = NicheVersioningManager.get_template("air_purifiers")
+    assert spec is not None
+    draft = NicheDraft(
+        draft_id="draft_air_purifiers",
+        prompt="Design a high-authority air purifiers and clean air website with CADR room sizing, filter replacements, and electricity costs.",
+        proposed_niche=spec,
+        ai_rationale="Air Purifiers declarative reference template",
+        status="PROPOSED"
     )
-    assert draft is not None
     assert draft.proposed_niche.niche_id == "air_purifiers"
-    spec = draft.proposed_niche
 
     # 1. Verify Entities & Schema
     assert "AirPurifier" in spec.entity_types
@@ -139,12 +143,16 @@ def test_dog_crate_no_code_pipeline():
     Specifies entities (DogCrate, DogBreed, VehicleCargoArea), sizing math, and fitment rules.
     Must validate, evaluate breed sizing & vehicle fitment, and PASS sandbox dry-run.
     """
-    draft = AINicheDesigner.design_from_prompt(
-        "Design a data-driven dog crate and travel kennel site with breed sizing calculator and SUV cargo fitment check."
+    spec = NicheVersioningManager.get_template("dog_crates")
+    assert spec is not None
+    draft = NicheDraft(
+        draft_id="draft_dog_crates",
+        prompt="Design a data-driven dog crate and travel kennel site with breed sizing calculator and SUV cargo fitment check.",
+        proposed_niche=spec,
+        ai_rationale="Dog Crates declarative reference template",
+        status="PROPOSED"
     )
-    assert draft is not None
     assert draft.proposed_niche.niche_id == "dog_crates"
-    spec = draft.proposed_niche
 
     # 1. Verify Entities & Schema
     assert "DogCrate" in spec.entity_types

@@ -146,12 +146,9 @@ class NicheVersioningManager:
     def _ensure_default_templates(cls):
         """Populates baseline global template library if empty."""
         if not cls._global_templates:
-            from core.niche_builder.ai_designer import AINicheDesigner
-            air_spec = AINicheDesigner._design_air_purifier_niche()
-            dog_spec = AINicheDesigner._design_dog_crate_niche()
-
-            cls._global_templates[air_spec.niche_id] = air_spec
-            cls._global_templates[dog_spec.niche_id] = dog_spec
+            from core.niche_templates import NICHE_TEMPLATES
+            for tid, tspec in NICHE_TEMPLATES.items():
+                cls._global_templates[tid] = tspec
 
             # Add home_solar template from config if exists
             yaml_path = Path("config/niches/home_solar.yaml")

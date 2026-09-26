@@ -2,6 +2,7 @@
 AI-Assisted Niche Designer, Critic, Market Researcher & Data Availability Scorer
 Transforms natural language prompts into complete, valid NicheDraft schemas.
 Provides critical evaluations without modifying code or auto-activating.
+Pure generic core: strictly zero domain-specific keyword lookup tables.
 """
 
 import re
@@ -25,6 +26,7 @@ from core.niche_builder.schema import (
     CapabilityType,
     RiskProfile,
     SourceType,
+    ProvenanceType,
     FreshnessPolicyType,
     IntentType,
 )
@@ -72,28 +74,125 @@ class MarketResearchReport(BaseModel):
 
 class AINicheDesigner:
     """
-    Synthesizes natural language domain descriptions into rich, valid NicheDraft schemas.
+    Pure Generic AI Niche Designer.
+    Generates structured, validated NicheDraft schemas from natural language descriptions
+    without hardcoded domain dictionaries or keyword routing.
     """
 
     @classmethod
+    def build_design_prompt(cls, user_description: str) -> str:
+        """
+        Constructs the formal system instruction prompt for LLM reasoning
+        mandating the strict structured NicheDraft output schema.
+        """
+        return f"""You are the OpenSEO AI Niche Architect.
+Analyze the user's natural language domain description and produce a complete, strictly structured JSON schema.
+
+User Description:
+\"\"\"{user_description}\"\"\"
+
+Required JSON Schema:
+{{
+  "niche_name": "<Human readable domain title>",
+  "niche_id": "<lowercase_snake_case_slug>",
+  "description": "<Concise domain description>",
+  "risk_profile": "LOW" | "MEDIUM" | "HIGH",
+  "capabilities": ["COMPATIBILITY", "CALCULATION", "COMPARISON", "PRODUCT_DATABASE", "TECHNICAL_SPECS", "AFFILIATE_COMMERCE"],
+  "entity_types": ["<PrimaryEntity>", "<ContextOrEnvironmentEntity>", ...],
+  "attributes": {{
+    "<EntityName>": [
+      {{
+        "key": "<attribute_snake_case>",
+        "display_name": "<Label>",
+        "data_type": "STRING"|"INTEGER"|"FLOAT"|"BOOLEAN"|"DIMENSION"|"POWER"|"MONEY",
+        "unit": "<unit_symbol_or_empty>",
+        "required": true|false,
+        "critical": true|false,
+        "preferred_source_type": "MANUFACTURER"|"CERTIFICATION"|"DOCUMENTATION"|"RETAILER"
+      }}
+    ]
+  }},
+  "relationships": [
+    {{
+      "source_entity": "<Entity1>",
+      "relationship": "suitable_for"|"compatible_with"|"uses"|"operates_in",
+      "target_entity": "<Entity2>",
+      "description": "<Description>"
+    }}
+  ],
+  "calculations": [
+    {{
+      "id": "<calc_id>",
+      "name": "<Formula Name>",
+      "formula": "<safe_arithmetic_formula>",
+      "output_unit": "<unit>",
+      "output_description": "<description>",
+      "required_variables": ["<var1>", "<var2>"],
+      "provenance_type": "MODEL_PROPOSED",
+      "confidence": 0.70,
+      "assumptions": ["<assumptions>"]
+    }}
+  ],
+  "suitability_or_compatibility_rules": [
+    {{
+      "rule_id": "<rule_id>",
+      "name": "<Rule Name>",
+      "subject_type": "<Entity1>",
+      "target_type": "<Entity2>",
+      "conditions": [
+        {{
+          "subject_attribute": "<attr>",
+          "operator": ">="|"<="|"=="|"IN",
+          "target_attribute": "<target_attr>",
+          "tolerance": 0.0
+        }}
+      ],
+      "pass_verdict": "STRONG_MATCH" | "PASS",
+      "fail_verdict": "NOT_SUITABLE" | "FAIL",
+      "provenance_type": "MODEL_PROPOSED",
+      "confidence": 0.70,
+      "assumptions": ["<assumptions>"]
+    }}
+  ],
+  "page_types": [
+    {{
+      "page_type_id": "compatibility"|"comparison"|"calculator"|"hub"|"troubleshooting",
+      "name": "<Page Type Name>",
+      "primary_intent": "COMPATIBILITY"|"COMPARISON"|"UTILITY"|"INFORMATIONAL",
+      "required_entities": ["<Entity1>"]
+    }}
+  ],
+  "source_policies": [
+    {{"source_type": "MANUFACTURER", "priority": 1, "allowed_for_critical_facts": true, "freshness_interval_days": 365}},
+    {{"source_type": "DOCUMENTATION", "priority": 2, "allowed_for_critical_facts": true, "freshness_interval_days": 365}},
+    {{"source_type": "RETAILER", "priority": 3, "allowed_for_critical_facts": false, "freshness_interval_days": 7}}
+  ],
+  "freshness_rules": [],
+  "monetization_types": ["affiliate_commerce", "display_ads"]
+}}
+
+Rules:
+1. All domain calculations and suitability rules MUST have provenance_type="MODEL_PROPOSED".
+2. Never claim unverified formulas are official standards without explicit citation evidence.
+3. Every attribute must map directly to observable physical, operational, or commercial metrics.
+"""
+
+    @classmethod
     def design_from_prompt(cls, prompt: str) -> NicheDraft:
-        clean = prompt.lower().strip()
+        """
+        Synthesizes a structured NicheDraft from an arbitrary natural language prompt
+        using generic semantic linguistic parsing and schema synthesis.
+        Strictly zero domain keyword routing tables.
+        """
+        clean_text = prompt.strip()
         draft_id = f"draft_{uuid.uuid4().hex[:8]}"
 
-        # Domain Detection: Air Purifiers
-        if any(w in clean for w in ["air purifier", "purifier", "cadr", "hepa", "filter replacement", "lọc không khí"]):
-            spec = cls._design_air_purifier_niche()
-            rationale = "Engineered around EPA / AHAM clean air delivery standards, CADR sizing math, and HEPA filter fitment."
-
-        # Domain Detection: Dog Crates & Pet Transport
-        elif any(w in clean for w in ["dog crate", "crate", "dog breed", "kennel", "chuồng chó", "lồng chó"]):
-            spec = cls._design_dog_crate_niche()
-            rationale = "Structured around AKC dog breed dimensions, crate volume math, and vehicle cargo area fitment."
-
-        # General / Universal Heuristic Template
-        else:
-            spec = cls._design_generic_product_niche(prompt)
-            rationale = "Synthesized standard product authority data model with verified specs, comparisons, and calculations."
+        spec = cls._synthesize_generic_ontology(clean_text)
+        rationale = (
+            f"Dynamically synthesized domain ontology with {len(spec.entity_types)} entities, "
+            f"{sum(len(v) for v in spec.attributes.values())} attributes, {len(spec.calculations)} proposed calculations, "
+            f"and {len(spec.compatibility_rules)} proposed rules based on prompt analysis."
+        )
 
         return NicheDraft(
             draft_id=draft_id,
@@ -104,336 +203,366 @@ class AINicheDesigner:
         )
 
     @classmethod
-    def _design_air_purifier_niche(cls) -> NicheSpec:
-        return NicheSpec(
-            niche_id="air_purifiers",
-            niche_name="Home Air Purifiers & Filtration Systems",
-            niche_description="US residential air purifier authority focusing on CADR, room size matching, filter replacement compatibility, and continuous running costs.",
-            version="1.0.0",
-            risk_profile=RiskProfile.LOW,
-            capabilities=[
-                CapabilityType.COMPATIBILITY,
-                CapabilityType.CALCULATION,
-                CapabilityType.COMPARISON,
-                CapabilityType.PRODUCT_DATABASE,
-                CapabilityType.TECHNICAL_SPECS,
-                CapabilityType.AFFILIATE_COMMERCE
-            ],
-            entity_types=["AirPurifier", "Filter", "Room", "Pollutant"],
-            attributes={
-                "AirPurifier": [
-                    AttributeSpec(key="cadr_smoke_cfm", display_name="Smoke CADR", data_type=DataType.INTEGER, unit="cfm", required=True, critical=True, preferred_source_type=SourceType.CERTIFICATION),
-                    AttributeSpec(key="cadr_dust_cfm", display_name="Dust CADR", data_type=DataType.INTEGER, unit="cfm", required=True, critical=True, preferred_source_type=SourceType.CERTIFICATION),
-                    AttributeSpec(key="cadr_pollen_cfm", display_name="Pollen CADR", data_type=DataType.INTEGER, unit="cfm", required=True, critical=True, preferred_source_type=SourceType.CERTIFICATION),
-                    AttributeSpec(key="recommended_room_sqft", display_name="Recommended Room Area", data_type=DataType.INTEGER, unit="sqft", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="power_consumption_watts", display_name="Rated Power Draw (Max)", data_type=DataType.POWER, unit="W", required=True, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="noise_level_min_db", display_name="Minimum Noise Level", data_type=DataType.FLOAT, unit="dB", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="noise_level_max_db", display_name="Maximum Noise Level", data_type=DataType.FLOAT, unit="dB", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="filter_slot_diameter_mm", display_name="Filter Slot Diameter", data_type=DataType.DIMENSION, unit="mm", required=False, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="oem_filter_replacement_cost_usd", display_name="OEM Filter Replacement Cost", data_type=DataType.MONEY, unit="USD", required=False, critical=False, preferred_source_type=SourceType.RETAILER),
-                ],
-                "Filter": [
-                    AttributeSpec(key="filter_type", display_name="Filtration Standard", data_type=DataType.STRING, unit="", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="lifespan_months", display_name="Expected Filter Lifespan", data_type=DataType.INTEGER, unit="months", required=True, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="filter_diameter_mm", display_name="Filter Outer Diameter", data_type=DataType.DIMENSION, unit="mm", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="replacement_price_usd", display_name="Filter Replacement Price", data_type=DataType.MONEY, unit="USD", required=True, critical=False, preferred_source_type=SourceType.RETAILER),
-                ],
-                "Room": [
-                    AttributeSpec(key="area_sqft", display_name="Room Floor Area", data_type=DataType.INTEGER, unit="sqft", required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION),
-                    AttributeSpec(key="ceiling_height_ft", display_name="Ceiling Height", data_type=DataType.FLOAT, unit="ft", required=False, critical=False, preferred_source_type=SourceType.DOCUMENTATION),
-                ],
-                "Pollutant": [
-                    AttributeSpec(key="particle_size_microns", display_name="Target Particle Size", data_type=DataType.FLOAT, unit="microns", required=True, critical=True, preferred_source_type=SourceType.GOVERNMENT),
-                ]
-            },
-            relationships=[
-                RelationshipSpec(source_entity="AirPurifier", relationship="uses", target_entity="Filter", description="Air purifier requires compatible filter model."),
-                RelationshipSpec(source_entity="AirPurifier", relationship="suitable_for", target_entity="Room", description="Calculated area suitability based on CADR 2/3 rule."),
-                RelationshipSpec(source_entity="Filter", relationship="captures", target_entity="Pollutant", description="HEPA filtration effectiveness against specific particle sizes.")
-            ],
-            calculations=[
+    def _synthesize_generic_ontology(cls, prompt: str) -> NicheSpec:
+        """
+        Extracts entities, attributes, relationships, calculations, and rules generically
+        from the grammatical and syntactic structure of the prompt.
+        """
+        low = prompt.lower()
+
+        # 1. Identify primary domain subject from action verb patterns
+        # e.g. "choose [X] based on", "find compatible [X] for", "comparing [X] against", "website about [X]"
+        primary_entity_name = "PrimaryProduct"
+        subject_matches = re.findall(
+            r"(?:choose|find|comparing|select|evaluate|recommend|review|testing)\s+([a-zA-Z0-9\s\-]+?)(?:\s+based on|\s+for|\s+against|\s+with|\s+and|\.|$)",
+            prompt,
+            re.IGNORECASE
+        )
+        if subject_matches:
+            raw_subj = subject_matches[0].strip()
+            # Clean words like "compatible", "high-authority", "best"
+            cleaned_subj = re.sub(r"^(?:compatible|high-authority|best|top|new|portable)\s+", "", raw_subj, flags=re.IGNORECASE)
+            words = [w.capitalize() for w in re.split(r"[\s\-_]+", cleaned_subj) if len(w) > 2]
+            if words:
+                primary_entity_name = "".join(words[:2])
+                # Singularize simple plural
+                if primary_entity_name.endswith("s") and not primary_entity_name.endswith("ss"):
+                    primary_entity_name = primary_entity_name[:-1]
+
+        # 2. Extract context environments, targets, and accessories
+        context_entities: List[str] = []
+        raw_factors: List[str] = []
+
+        # Extract "based on <factors>" or "with <factors>"
+        factor_match = re.search(r"(?:based on|with|considering|evaluating)\s+([^.]+)", prompt, re.IGNORECASE)
+        if factor_match:
+            parts = re.split(r",|\band\b", factor_match.group(1))
+            raw_factors = [p.strip() for p in parts if p.strip()]
+
+        # Extract "for their <target>" or "for <target>"
+        target_match = re.search(r"(?:for their|for)\s+([a-zA-Z0-9\s]+?)(?:models|systems|setups|machines|units|\.|,)", prompt, re.IGNORECASE)
+        if target_match:
+            tgt_phrase = target_match.group(1).strip()
+            tgt_words = [w.capitalize() for w in tgt_phrase.split() if len(w) > 2 and w.lower() not in ["their", "your", "each", "both"]]
+            if tgt_words:
+                tgt_name = "".join(tgt_words[:2])
+                if tgt_name and tgt_name != primary_entity_name and tgt_name not in context_entities:
+                    context_entities.append(tgt_name)
+
+        # Syntactically extract environment or container nouns from factor phrases
+        for factor in raw_factors:
+            f_clean = factor.strip()
+            # Match physical environment or container nouns like "<noun> conditions", "<noun> size", "<noun> environment", "<noun> area"
+            m = re.search(r"([a-zA-Z]+)\s+(?:conditions|size|environment|space|enclosure|area)", f_clean, re.IGNORECASE)
+            if m:
+                env_word = m.group(1).capitalize()
+                if env_word and env_word != primary_entity_name and env_word not in context_entities:
+                    context_entities.append(env_word)
+            # Detect component or media factors like "filter media"
+            elif any(k in f_clean.lower() for k in ["media", "consumable", "accessory", "replacement"]):
+                words = [w.capitalize() for w in f_clean.split() if len(w) > 2]
+                if words:
+                    comp_name = "".join(words[:2])
+                    if comp_name != primary_entity_name and comp_name not in context_entities:
+                        context_entities.append(comp_name)
+
+        # If secondary entities are mentioned in "find compatible presser feet, bobbins, needles"
+        accessory_match = re.search(r"(?:compatible|matching|replacement)\s+([^.]+?)\s+for", prompt, re.IGNORECASE)
+        if accessory_match:
+            acc_parts = re.split(r",|\band\b", accessory_match.group(1))
+            for p in acc_parts:
+                p_clean = p.strip()
+                p_words = [w.capitalize() for w in p_clean.split() if len(w) > 2 and w.lower() not in ["their", "other", "all"]]
+                if p_words:
+                    acc_name = "".join(p_words[:2])
+                    if acc_name.endswith("s") and not acc_name.endswith("ss"):
+                        acc_name = acc_name[:-1]
+                    if acc_name and acc_name != primary_entity_name and acc_name not in context_entities:
+                        context_entities.append(acc_name)
+
+        # Default fallback entity if only 1 entity found to ensure relational authority
+        if not context_entities:
+            context_entities.append("TargetEnvironment")
+
+        all_entity_types = [primary_entity_name] + context_entities
+
+        # 3. Attribute Extraction based on semantic factor patterns
+        attributes: Dict[str, List[AttributeSpec]] = {e: [] for e in all_entity_types}
+
+        # Core baseline attributes for primary product
+        attributes[primary_entity_name].append(
+            AttributeSpec(key="brand", display_name="Brand / Manufacturer", data_type=DataType.STRING, required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER)
+        )
+        attributes[primary_entity_name].append(
+            AttributeSpec(key="model", display_name="Model Number / Designation", data_type=DataType.STRING, required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER)
+        )
+        attributes[primary_entity_name].append(
+            AttributeSpec(key="retail_price_usd", display_name="Retail Price", data_type=DataType.MONEY, unit="USD", required=False, critical=False, preferred_source_type=SourceType.RETAILER)
+        )
+
+        # Map factors into structured attributes
+        has_power_factor = False
+        has_flow_factor = False
+        has_size_factor = False
+
+        for f in raw_factors:
+            f_clean = f.lower().strip()
+            attr_slug = re.sub(r"[^a-z0-9]+", "_", f_clean).strip("_")
+
+            # Dimensional / Sizing factors
+            if any(k in f_clean for k in ["size", "area", "dimension", "length", "width", "height", "volume", "clearance", "sqft", "sq ft"]):
+                has_size_factor = True
+                unit_val = "sqft" if "sqft" in f_clean else ("gal" if "gal" in f_clean else ("in" if "in" in f_clean else "units"))
+                attributes[primary_entity_name].append(
+                    AttributeSpec(
+                        key=f"recommended_{attr_slug}",
+                        display_name=f.title() + " Rating",
+                        data_type=DataType.DIMENSION,
+                        unit=unit_val,
+                        required=True,
+                        critical=True,
+                        preferred_source_type=SourceType.MANUFACTURER
+                    )
+                )
+                # Also attribute to context entity if appropriate
+                tgt_ent = next((e for e in context_entities if e.lower() in f_clean), context_entities[0])
+                attributes[tgt_ent].append(
+                    AttributeSpec(
+                        key=f"{attr_slug}",
+                        display_name=f.title(),
+                        data_type=DataType.DIMENSION,
+                        unit=unit_val,
+                        required=True,
+                        critical=True,
+                        preferred_source_type=SourceType.DOCUMENTATION
+                    )
+                )
+
+            # Power / Energy factors
+            elif any(k in f_clean for k in ["energy", "power", "watt", "electricity", "consumption"]):
+                has_power_factor = True
+                attributes[primary_entity_name].append(
+                    AttributeSpec(
+                        key="power_consumption_watts",
+                        display_name="Rated Power Consumption",
+                        data_type=DataType.POWER,
+                        unit="W",
+                        required=True,
+                        critical=False,
+                        preferred_source_type=SourceType.MANUFACTURER
+                    )
+                )
+
+            # Flow / Rate / Capacity factors
+            elif any(k in f_clean for k in ["flow", "turnover", "throughput", "capacity", "rate", "delivery"]):
+                has_flow_factor = True
+                unit_str = "units/hr" if "flow" in f_clean or "turnover" in f_clean else "capacity_units"
+                attributes[primary_entity_name].append(
+                    AttributeSpec(
+                        key=f"{attr_slug}",
+                        display_name=f.title(),
+                        data_type=DataType.FLOAT,
+                        unit=unit_str,
+                        required=True,
+                        critical=True,
+                        preferred_source_type=SourceType.MANUFACTURER
+                    )
+                )
+
+            # Sound / Noise factors
+            elif any(k in f_clean for k in ["noise", "sound", "decibel", "db", "quiet"]):
+                attributes[primary_entity_name].append(
+                    AttributeSpec(
+                        key="noise_level_db",
+                        display_name="Operating Noise Level",
+                        data_type=DataType.FLOAT,
+                        unit="dB",
+                        required=False,
+                        critical=False,
+                        preferred_source_type=SourceType.MANUFACTURER
+                    )
+                )
+
+            # Cost / Running / Operating cost factors
+            elif any(k in f_clean for k in ["cost", "operating", "running", "maintenance"]):
+                if "operating" in f_clean or "running" in f_clean:
+                    has_power_factor = True
+                attributes[primary_entity_name].append(
+                    AttributeSpec(
+                        key=f"{attr_slug}_usd",
+                        display_name=f.title() + " (Annual)",
+                        data_type=DataType.MONEY,
+                        unit="USD",
+                        required=False,
+                        critical=False,
+                        preferred_source_type=SourceType.RETAILER
+                    )
+                )
+
+            # Categorical / Setup / Method factors
+            else:
+                attributes[primary_entity_name].append(
+                    AttributeSpec(
+                        key=f"{attr_slug}",
+                        display_name=f.title(),
+                        data_type=DataType.STRING,
+                        unit="",
+                        required=True,
+                        critical=False,
+                        preferred_source_type=SourceType.MANUFACTURER
+                    )
+                )
+
+        # Ensure context entities have at least 2 attributes
+        for ce in context_entities:
+            if len(attributes[ce]) == 0:
+                attributes[ce].append(
+                    AttributeSpec(key="name_designation", display_name="Type / Classification", data_type=DataType.STRING, required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION)
+                )
+                attributes[ce].append(
+                    AttributeSpec(key="specification_value", display_name="Operating Requirement", data_type=DataType.STRING, required=True, critical=False, preferred_source_type=SourceType.DOCUMENTATION)
+                )
+
+        # 4. Propose Relationships
+        relationships: List[RelationshipSpec] = []
+        for ce in context_entities:
+            relationships.append(
+                RelationshipSpec(
+                    source_entity=primary_entity_name,
+                    relationship="suitable_for" if any(w in ce.lower() for w in ["room", "tank", "environment", "area"]) else "compatible_with",
+                    target_entity=ce,
+                    description=f"{primary_entity_name} evaluated against {ce} operating requirements and specifications."
+                )
+            )
+
+        # 5. Propose Calculations based on extracted variables
+        calculations: List[CalculationSpec] = []
+
+        if has_power_factor or any("power" in a.key or "watt" in a.key for a in attributes[primary_entity_name]):
+            calculations.append(
                 CalculationSpec(
-                    id="air_purifier_room_suitability",
-                    name="AHAM CADR 2/3 Room Area Match",
-                    formula="cadr_smoke_cfm * 1.5",
-                    output_unit="sqft",
-                    output_description="Maximum recommended room floor area under AHAM 4.8 air changes per hour standard.",
-                    required_variables=["cadr_smoke_cfm"]
-                ),
-                CalculationSpec(
-                    id="annual_electricity_cost",
+                    id="annual_operating_cost",
                     name="Annual Electrical Operating Cost",
                     formula="(power_consumption_watts / 1000.0) * hours_per_day * 365.0 * electricity_rate_kwh",
                     output_unit="USD",
-                    output_description="Estimated annual continuous electrical utility cost.",
-                    required_variables=["power_consumption_watts", "hours_per_day", "electricity_rate_kwh"]
-                ),
-                CalculationSpec(
-                    id="annual_filter_cost",
-                    name="Annual Filter Replacement Budget",
-                    formula="(12.0 / lifespan_months) * replacement_price_usd",
-                    output_unit="USD",
-                    output_description="Estimated annual consumables budget based on replacement frequency.",
-                    required_variables=["lifespan_months", "replacement_price_usd"]
+                    output_description="Estimated annual continuous electrical utility cost based on wattage, usage hours, and kWh electricity tariff.",
+                    required_variables=["power_consumption_watts", "hours_per_day", "electricity_rate_kwh"],
+                    provenance_type="MODEL_PROPOSED",
+                    source_ids=[],
+                    confidence=0.70,
+                    assumptions=["Heuristic electricity model requiring local utility tariff verification (e.g. baseline assumption $0.16/kWh)"]
                 )
-            ],
-            compatibility_rules=[
-                CompatibilityRuleSpec(
-                    rule_id="purifier_filter_fit",
-                    name="Filter Slot Physical Compatibility",
-                    subject_type="Filter",
-                    target_type="AirPurifier",
-                    conditions=[
-                        ConditionSpec(
-                            subject_attribute="filter_diameter_mm",
-                            operator="==",
-                            target_attribute="filter_slot_diameter_mm",
-                            tolerance=2.0
-                        )
-                    ],
-                    pass_verdict="PASS",
-                    pass_status="EXACT_FIT",
-                    fail_verdict="FAIL",
-                    fail_status="DOES_NOT_FIT",
-                    explanation_pass="Filter dimensions fit inside air purifier enclosure.",
-                    explanation_fail="Filter diameter does not match air purifier slot."
-                )
-            ],
-            source_policies=[
-                SourcePolicySpec(source_type=SourceType.CERTIFICATION, priority=1, allowed_for_critical_facts=True, freshness_interval_days=730),
-                SourcePolicySpec(source_type=SourceType.MANUFACTURER, priority=2, allowed_for_critical_facts=True, freshness_interval_days=365),
-                SourcePolicySpec(source_type=SourceType.RETAILER, priority=4, allowed_for_critical_facts=False, freshness_interval_days=7)
-            ],
-            page_types=[
-                PageTypeSpec(page_type_id="compatibility", name="Filter Replacement Fitment Guide", primary_intent=IntentType.COMPATIBILITY, required_entities=["AirPurifier", "Filter"], required_attributes=["cadr_smoke_cfm", "filter_diameter_mm"]),
-                PageTypeSpec(page_type_id="comparison", name="Room Sizing & CADR Comparison", primary_intent=IntentType.COMPARISON, required_entities=["AirPurifier", "Room"], required_attributes=["cadr_smoke_cfm", "recommended_room_sqft"]),
-                PageTypeSpec(page_type_id="calculator", name="Annual Running Cost Calculator", primary_intent=IntentType.UTILITY, required_entities=["AirPurifier", "Filter"], required_attributes=["power_consumption_watts", "replacement_price_usd"])
-            ],
-            intent_taxonomy={
-                "COMPATIBILITY_GUIDE": ["replacement filter for", "fits in", "compatible with", "filter size for"],
-                "ENGINEERING_RUNTIME": ["cadr for room", "how much electricity does", "air changes per hour", "running cost"],
-                "VS_COMPARISON": [" vs ", " versus ", " compare "]
-            },
-            cluster_differentiators=["hepa", "cadr", "filter", "cost", "smoke", "allergies", "room"]
-        )
-
-    @classmethod
-    def _design_dog_crate_niche(cls) -> NicheSpec:
-        return NicheSpec(
-            niche_id="dog_crates",
-            niche_name="Dog Crates, Travel Kennels & Vehicle Fitment",
-            niche_description="Independent canine travel authority comparing crate dimensions against dog breed sizing and vehicle cargo spaces.",
-            version="1.0.0",
-            risk_profile=RiskProfile.LOW,
-            capabilities=[
-                CapabilityType.COMPATIBILITY,
-                CapabilityType.CALCULATION,
-                CapabilityType.COMPARISON,
-                CapabilityType.PRODUCT_DATABASE,
-                CapabilityType.TECHNICAL_SPECS,
-                CapabilityType.AFFILIATE_COMMERCE
-            ],
-            entity_types=["DogCrate", "DogBreed", "VehicleCargoArea"],
-            attributes={
-                "DogCrate": [
-                    AttributeSpec(key="internal_length_inches", display_name="Internal Floor Length", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="internal_width_inches", display_name="Internal Floor Width", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="internal_height_inches", display_name="Internal Height", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="external_height_inches", display_name="Exterior Height", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="crate_weight_lbs", display_name="Tare Crate Weight", data_type=DataType.FLOAT, unit="lbs", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="max_dog_weight_lbs", display_name="Max Dog Weight Rating", data_type=DataType.FLOAT, unit="lbs", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                ],
-                "DogBreed": [
-                    AttributeSpec(key="avg_length_snout_to_tail_inches", display_name="Average Body Length", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION),
-                    AttributeSpec(key="avg_withers_height_inches", display_name="Average Standing Height", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION),
-                    AttributeSpec(key="avg_adult_weight_lbs", display_name="Average Adult Weight", data_type=DataType.FLOAT, unit="lbs", required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION),
-                ],
-                "VehicleCargoArea": [
-                    AttributeSpec(key="cargo_opening_height_inches", display_name="Cargo Opening Height", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                    AttributeSpec(key="cargo_floor_depth_inches", display_name="Cargo Floor Depth", data_type=DataType.DIMENSION, unit="in", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                ]
-            },
-            relationships=[
-                RelationshipSpec(source_entity="DogCrate", relationship="suitable_for", target_entity="DogBreed", description="Evaluates whether crate provides adequate turnaround space for breed."),
-                RelationshipSpec(source_entity="DogCrate", relationship="fits_inside", target_entity="VehicleCargoArea", description="Evaluates physical enclosure clearance into vehicle trunk.")
-            ],
-            calculations=[
-                CalculationSpec(
-                    id="dog_crate_min_length_needed",
-                    name="AKC Crate Minimum Length Rule",
-                    formula="avg_length_snout_to_tail_inches + 4.0",
-                    output_unit="in",
-                    output_description="AKC recommended minimum crate floor length (dog body length plus 4 inches).",
-                    required_variables=["avg_length_snout_to_tail_inches"]
-                ),
-                CalculationSpec(
-                    id="dog_crate_min_height_needed",
-                    name="AKC Crate Minimum Height Rule",
-                    formula="avg_withers_height_inches + 3.0",
-                    output_unit="in",
-                    output_description="AKC recommended minimum crate standing height (dog withers height plus 3 inches).",
-                    required_variables=["avg_withers_height_inches"]
-                )
-            ],
-            compatibility_rules=[
-                CompatibilityRuleSpec(
-                    rule_id="crate_dog_size_suitability",
-                    name="Dog Crate to Breed Sizing Fit",
-                    subject_type="DogCrate",
-                    target_type="DogBreed",
-                    conditions=[
-                        ConditionSpec(
-                            subject_attribute="internal_length_inches",
-                            operator=">=",
-                            target_attribute="avg_length_snout_to_tail_inches",
-                            tolerance=-4.0  # internal length >= dog length + 4
-                        ),
-                        ConditionSpec(
-                            subject_attribute="max_dog_weight_lbs",
-                            operator=">=",
-                            target_attribute="avg_adult_weight_lbs",
-                            tolerance=0.0
-                        )
-                    ],
-                    pass_verdict="PASS",
-                    pass_status="EXACT_FIT",
-                    fail_verdict="FAIL",
-                    fail_status="TOO_SMALL",
-                    explanation_pass="Crate allows adult dog to comfortably stand up, turn around, and lie down.",
-                    explanation_fail="Crate does not provide required ergonomic turnaround space or exceeds weight rating."
-                )
-            ],
-            source_policies=[
-                SourcePolicySpec(source_type=SourceType.MANUFACTURER, priority=1, allowed_for_critical_facts=True, freshness_interval_days=730),
-                SourcePolicySpec(source_type=SourceType.DOCUMENTATION, priority=2, allowed_for_critical_facts=True, freshness_interval_days=730),
-                SourcePolicySpec(source_type=SourceType.RETAILER, priority=4, allowed_for_critical_facts=False, freshness_interval_days=7)
-            ],
-            page_types=[
-                PageTypeSpec(page_type_id="compatibility", name="Dog Breed Crate Size Guide", primary_intent=IntentType.COMPATIBILITY, required_entities=["DogCrate", "DogBreed"], required_attributes=["internal_length_inches", "avg_length_snout_to_tail_inches"]),
-                PageTypeSpec(page_type_id="comparison", name="Crate Comparison by Dog Weight", primary_intent=IntentType.COMPARISON, required_entities=["DogCrate"], required_attributes=["max_dog_weight_lbs", "internal_length_inches"])
-            ],
-            intent_taxonomy={
-                "COMPATIBILITY_GUIDE": ["crate size for", "what size crate for", "fits in car", "kennel size for"],
-                "VS_COMPARISON": [" vs ", " versus ", " compare "]
-            },
-            cluster_differentiators=["breed", "crate", "size", "weight", "kennel", "inches"]
-        )
-
-    @classmethod
-    def _design_generic_product_niche(cls, prompt: str) -> NicheSpec:
-        clean = prompt.lower().strip()
-        
-        # Semantic Dehumidifiers & Home Climate Synthesis
-        if any(w in clean for w in ["dehumidifier", "humidity", "moisture", "hút ẩm"]):
-            return NicheSpec(
-                niche_id="home_dehumidifiers",
-                niche_name="Home Dehumidifiers & Moisture Control",
-                niche_description="US residential dehumidifier authority matching room dimensions, humidity levels, cold basement conditions, drainage mechanisms, and annual energy costs.",
-                version="1.0.0",
-                risk_profile=RiskProfile.LOW,
-                capabilities=[
-                    CapabilityType.COMPATIBILITY,
-                    CapabilityType.CALCULATION,
-                    CapabilityType.COMPARISON,
-                    CapabilityType.PRODUCT_DATABASE,
-                    CapabilityType.TECHNICAL_SPECS,
-                    CapabilityType.AFFILIATE_COMMERCE
-                ],
-                entity_types=["Dehumidifier", "Room", "Basement"],
-                attributes={
-                    "Dehumidifier": [
-                        AttributeSpec(key="capacity_pints_day", display_name="DOE Removal Capacity", data_type=DataType.FLOAT, unit="", required=True, critical=True, preferred_source_type=SourceType.CERTIFICATION),
-                        AttributeSpec(key="recommended_room_sqft", display_name="Recommended Room Area", data_type=DataType.DIMENSION, unit="sqft", required=True, critical=True, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="power_consumption_watts", display_name="Rated Power Draw", data_type=DataType.POWER, unit="W", required=True, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="energy_factor_l_kwh", display_name="Integrated Energy Factor (IEF)", data_type=DataType.FLOAT, unit="", required=True, critical=True, preferred_source_type=SourceType.CERTIFICATION),
-                        AttributeSpec(key="energy_star_certified", display_name="Energy Star Status", data_type=DataType.BOOLEAN, unit="", required=True, critical=False, preferred_source_type=SourceType.CERTIFICATION),
-                        AttributeSpec(key="drainage_method", display_name="Drainage & Continuous Drain Options", data_type=DataType.STRING, unit="", required=True, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="has_internal_pump", display_name="Internal Condensate Pump", data_type=DataType.BOOLEAN, unit="", required=True, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="water_tank_capacity_pints", display_name="Water Tank Capacity", data_type=DataType.FLOAT, unit="", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="min_operating_temp_f", display_name="Operating Temperature Range", data_type=DataType.FLOAT, unit="", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="auto_defrost", display_name="Auto Defrost for Basements", data_type=DataType.BOOLEAN, unit="", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="noise_level_db", display_name="Operating Noise Level", data_type=DataType.FLOAT, unit="", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="washable_filter", display_name="Washable Air Filter Included", data_type=DataType.BOOLEAN, unit="", required=False, critical=False, preferred_source_type=SourceType.MANUFACTURER),
-                        AttributeSpec(key="retail_price_usd", display_name="Retail Price", data_type=DataType.MONEY, unit="USD", required=False, critical=False, preferred_source_type=SourceType.RETAILER),
-                    ],
-                    "Room": [
-                        AttributeSpec(key="area_sqft", display_name="Room Floor Area", data_type=DataType.DIMENSION, unit="sqft", required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION),
-                        AttributeSpec(key="humidity_level", display_name="Dampness & Relative Humidity Level", data_type=DataType.STRING, unit="", required=True, critical=False, preferred_source_type=SourceType.DOCUMENTATION),
-                        AttributeSpec(key="ceiling_height_ft", display_name="Ceiling Height", data_type=DataType.FLOAT, unit="", required=False, critical=False, preferred_source_type=SourceType.DOCUMENTATION),
-                    ],
-                    "Basement": [
-                        AttributeSpec(key="temperature_f", display_name="Typical Ambient Temperature", data_type=DataType.FLOAT, unit="", required=True, critical=True, preferred_source_type=SourceType.DOCUMENTATION),
-                        AttributeSpec(key="has_floor_drain", display_name="Floor Drain Available", data_type=DataType.BOOLEAN, unit="", required=True, critical=False, preferred_source_type=SourceType.DOCUMENTATION),
-                    ]
-                },
-                relationships=[
-                    RelationshipSpec(source_entity="Dehumidifier", relationship="suitable_for", target_entity="Room", description="Calculated dehumidification capacity matches room square footage and humidity level."),
-                    RelationshipSpec(source_entity="Dehumidifier", relationship="operates_in", target_entity="Basement", description="Dehumidifier low-temperature defrost and pump support cold basement operation.")
-                ],
-                calculations=[
-                    CalculationSpec(
-                        id="annual_electricity_cost",
-                        name="Annual Electrical Operating Cost",
-                        formula="(power_consumption_watts / 1000.0) * hours_per_day * 365.0 * electricity_rate_kwh",
-                        output_unit="USD",
-                        output_description="Estimated annual continuous electrical utility cost based on wattage, usage hours, and kWh electricity tariff.",
-                        required_variables=["power_consumption_watts", "hours_per_day", "electricity_rate_kwh"]
-                    ),
-                    CalculationSpec(
-                        id="dehumidifier_room_suitability",
-                        name="Recommended Coverage Capacity Match",
-                        formula="capacity_pints_day * 50.0",
-                        output_unit="sqft",
-                        output_description="AHAM standard estimated maximum coverage area based on pints per 24 hours.",
-                        required_variables=["capacity_pints_day"]
-                    )
-                ],
-                compatibility_rules=[
-                    CompatibilityRuleSpec(
-                        rule_id="dehumidifier_room_sizing_suitability",
-                        name="Room Sizing & Moisture Capacity Suitability",
-                        subject_type="Dehumidifier",
-                        target_type="Room",
-                        conditions=[
-                            ConditionSpec(
-                                subject_attribute="recommended_room_sqft",
-                                operator=">=",
-                                target_attribute="area_sqft",
-                                tolerance=0.0
-                            )
-                        ],
-                        pass_verdict="PASS",
-                        pass_status="SUITABLE_SIZE",
-                        fail_verdict="FAIL",
-                        fail_status="UNDERTANKED_OR_UNDERPOWERED",
-                        explanation_pass="Dehumidifier capacity is appropriately sized to maintain 45-50% relative humidity in this room.",
-                        explanation_fail="Room area exceeds dehumidifier rated capacity; risk of continuous non-stop compressor cycling."
-                    )
-                ],
-                source_policies=[
-                    SourcePolicySpec(source_type=SourceType.CERTIFICATION, priority=1, allowed_for_critical_facts=True, freshness_interval_days=730),
-                    SourcePolicySpec(source_type=SourceType.MANUFACTURER, priority=2, allowed_for_critical_facts=True, freshness_interval_days=365),
-                    SourcePolicySpec(source_type=SourceType.DOCUMENTATION, priority=3, allowed_for_critical_facts=True, freshness_interval_days=365),
-                    SourcePolicySpec(source_type=SourceType.RETAILER, priority=4, allowed_for_critical_facts=False, freshness_interval_days=7)
-                ],
-                page_types=[
-                    PageTypeSpec(page_type_id="suitability", name="Room Sizing & Moisture Capacity Guide", primary_intent=IntentType.COMPATIBILITY, required_entities=["Dehumidifier", "Room"], required_attributes=["recommended_room_sqft", "capacity_pints_day"]),
-                    PageTypeSpec(page_type_id="calculator", name="Annual Running Cost & Electricity Calculator", primary_intent=IntentType.UTILITY, required_entities=["Dehumidifier"], required_attributes=["power_consumption_watts"]),
-                    PageTypeSpec(page_type_id="comparison", name="Basement Dehumidifiers with Pump Comparison", primary_intent=IntentType.COMPARISON, required_entities=["Dehumidifier", "Basement"], required_attributes=["capacity_pints_day", "min_operating_temp_f"]),
-                    PageTypeSpec(page_type_id="hub", name="Home Humidity & Dehumidifier Sizing Hub", primary_intent=IntentType.INFORMATIONAL, required_entities=["Dehumidifier", "Room", "Basement"], required_attributes=["capacity_pints_day", "recommended_room_sqft"]),
-                    PageTypeSpec(page_type_id="troubleshooting", name="Cold Basement & Frost Problem Solutions", primary_intent=IntentType.INFORMATIONAL, required_entities=["Dehumidifier", "Basement"], required_attributes=["min_operating_temp_f", "auto_defrost"])
-                ],
-                intent_taxonomy={
-                    "SIZING_SUITABILITY": ["what size dehumidifier for", "dehumidifier for sq ft", "pints needed for", "sizing chart"],
-                    "BASEMENT_DRAINAGE": ["basement dehumidifier with pump", "continuous drain", "cold basement", "auto defrost"],
-                    "RUNNING_COST": ["how much electricity does a dehumidifier use", "running cost per month", "energy star dehumidifier"],
-                    "VS_COMPARISON": [" vs ", " versus ", " compare "]
-                },
-                cluster_differentiators=["pints", "basement", "pump", "sqft", "energy star", "continuous drain", "cost", "humidity", "noise"]
             )
 
-        clean_name = prompt[:40].strip().title()
-        slug = re.sub(r"[^a-zA-Z0-9]+", "_", clean_name).lower().strip("_")
+        if has_flow_factor and has_size_factor:
+            calculations.append(
+                CalculationSpec(
+                    id="system_turnover_rate",
+                    name="Hourly Turnover Rate Sizing",
+                    formula="flow_rate_primary / volume_target",
+                    output_unit="turnovers/hr",
+                    output_description="Calculated hourly circulation/turnover rate relative to target volume.",
+                    required_variables=["flow_rate_primary", "volume_target"],
+                    provenance_type="MODEL_PROPOSED",
+                    source_ids=[],
+                    confidence=0.70,
+                    assumptions=["Standard circulation guideline derived from prompt requirements"]
+                )
+            )
+        elif has_size_factor:
+            calculations.append(
+                CalculationSpec(
+                    id="coverage_suitability_ratio",
+                    name="Rated Coverage Suitability Ratio",
+                    formula="rated_coverage / actual_target_size",
+                    output_unit="ratio",
+                    output_description="Calculated ratio of rated capacity against target dimension requirements.",
+                    required_variables=["rated_coverage", "actual_target_size"],
+                    provenance_type="MODEL_PROPOSED",
+                    source_ids=[],
+                    confidence=0.70,
+                    assumptions=["Direct linear sizing ratio comparison"]
+                )
+            )
+
+        # 6. Propose Suitability & Compatibility Rules
+        compatibility_rules: List[CompatibilityRuleSpec] = []
+        target_entity = context_entities[0] if context_entities else "TargetEnvironment"
+
+        # Sizing / capacity compatibility rule
+        size_attrs_primary = [a.key for a in attributes[primary_entity_name] if "size" in a.key or "sqft" in a.key or "volume" in a.key or "flow" in a.key]
+        size_attrs_target = [a.key for a in attributes[target_entity] if "size" in a.key or "sqft" in a.key or "volume" in a.key or "area" in a.key]
+
+        subj_attr = size_attrs_primary[0] if size_attrs_primary else attributes[primary_entity_name][0].key
+        tgt_attr = size_attrs_target[0] if size_attrs_target else attributes[target_entity][0].key
+
+        compatibility_rules.append(
+            CompatibilityRuleSpec(
+                rule_id=f"{primary_entity_name.lower()}_{target_entity.lower()}_suitability",
+                name=f"{primary_entity_name} to {target_entity} Sizing Suitability",
+                subject_type=primary_entity_name,
+                target_type=target_entity,
+                conditions=[
+                    ConditionSpec(
+                        subject_attribute=subj_attr,
+                        operator=">=",
+                        target_attribute=tgt_attr,
+                        tolerance=0.0
+                    )
+                ],
+                pass_verdict="STRONG_MATCH",
+                pass_status="SUITABLE_MATCH",
+                fail_verdict="NOT_SUITABLE",
+                fail_status="UNDERSIZED_OR_INCOMPATIBLE",
+                explanation_pass=f"{primary_entity_name} specifications meet or exceed recommended {target_entity} operational thresholds.",
+                explanation_fail=f"{primary_entity_name} capacity is insufficient for {target_entity} requirements.",
+                provenance_type="MODEL_PROPOSED",
+                confidence=0.70,
+                assumptions=["Model proposed suitability rule awaiting empirical manufacturer source verification"]
+            )
+        )
+
+        # 7. Propose Standard Strategy Page Types
+        page_types = [
+            PageTypeSpec(
+                page_type_id="suitability",
+                name=f"{primary_entity_name} Sizing & Suitability Guide",
+                primary_intent=IntentType.COMPATIBILITY,
+                required_entities=[primary_entity_name, target_entity]
+            ),
+            PageTypeSpec(
+                page_type_id="comparison",
+                name=f"Top {primary_entity_name} Head-to-Head Comparison",
+                primary_intent=IntentType.COMPARISON,
+                required_entities=[primary_entity_name]
+            ),
+            PageTypeSpec(
+                page_type_id="calculator",
+                name=f"{primary_entity_name} Operating Cost & Sizing Calculator",
+                primary_intent=IntentType.UTILITY,
+                required_entities=[primary_entity_name]
+            ),
+            PageTypeSpec(
+                page_type_id="hub",
+                name=f"Complete {primary_entity_name} Buyer's Authority Hub",
+                primary_intent=IntentType.INFORMATIONAL,
+                required_entities=[primary_entity_name, target_entity]
+            )
+        ]
+
+        # 8. Source Policies
+        source_policies = [
+            SourcePolicySpec(source_type=SourceType.MANUFACTURER, priority=1, allowed_for_critical_facts=True, freshness_interval_days=365),
+            SourcePolicySpec(source_type=SourceType.DOCUMENTATION, priority=2, allowed_for_critical_facts=True, freshness_interval_days=365),
+            SourcePolicySpec(source_type=SourceType.RETAILER, priority=3, allowed_for_critical_facts=False, freshness_interval_days=7)
+        ]
+
+        # 9. Clean Niche Name & ID
+        clean_name = f"{primary_entity_name} Authority Guide"
+        slug = re.sub(r"(?<!^)(?=[A-Z])", "_", primary_entity_name).lower().strip("_")
+        if not slug:
+            slug = f"niche_{uuid.uuid4().hex[:6]}"
+
         return NicheSpec(
             niche_id=slug,
             niche_name=clean_name,
@@ -441,40 +570,35 @@ class AINicheDesigner:
             version="1.0.0",
             risk_profile=RiskProfile.LOW,
             capabilities=[
+                CapabilityType.COMPATIBILITY,
+                CapabilityType.CALCULATION,
+                CapabilityType.COMPARISON,
                 CapabilityType.PRODUCT_DATABASE,
                 CapabilityType.TECHNICAL_SPECS,
-                CapabilityType.COMPARISON,
                 CapabilityType.AFFILIATE_COMMERCE
             ],
-            entity_types=["PrimaryProduct", "Accessory"],
-            attributes={
-                "PrimaryProduct": [
-                    AttributeSpec(key="weight_lbs", display_name="Unit Weight", data_type=DataType.FLOAT, unit="", required=True, critical=False),
-                    AttributeSpec(key="dimensions_length_inches", display_name="Length", data_type=DataType.DIMENSION, unit="in", required=True, critical=True),
-                    AttributeSpec(key="base_price_usd", display_name="Retail Price", data_type=DataType.MONEY, unit="USD", required=False, critical=False),
-                ],
-                "Accessory": [
-                    AttributeSpec(key="price_usd", display_name="Price", data_type=DataType.MONEY, unit="USD", required=True, critical=False),
-                ]
+            entity_types=all_entity_types,
+            attributes=attributes,
+            relationships=relationships,
+            calculations=calculations,
+            compatibility_rules=compatibility_rules,
+            source_policies=source_policies,
+            page_types=page_types,
+            freshness_rules=[],
+            monetization_types=["affiliate_commerce", "display_ads"],
+            intent_taxonomy={
+                "SIZING_SUITABILITY": ["what size", "how to choose", "recommendation for", "sizing chart"],
+                "VS_COMPARISON": [" vs ", " versus ", " compare ", "best models"],
+                "COST_CALCULATOR": ["how much does it cost", "running cost", "power consumption", "calculator"]
             },
-            relationships=[
-                RelationshipSpec(source_entity="PrimaryProduct", relationship="accepts", target_entity="Accessory")
-            ],
-            calculations=[],
-            compatibility_rules=[],
-            source_policies=[
-                SourcePolicySpec(source_type=SourceType.MANUFACTURER, priority=1, allowed_for_critical_facts=True),
-                SourcePolicySpec(source_type=SourceType.RETAILER, priority=3, allowed_for_critical_facts=False)
-            ],
-            page_types=[
-                PageTypeSpec(page_type_id="comparison", name="Product Comparison Guide", primary_intent=IntentType.COMPARISON, required_entities=["PrimaryProduct"])
-            ]
+            cluster_differentiators=[e.lower() for e in all_entity_types] + ["cost", "specs", "size", "reviews"]
         )
 
 
 class AINicheCritic:
     """
     Rigorously answers the 8 architectural critique questions before niche activation.
+    Pure generic reasoning without domain-specific hardcoding.
     """
 
     @classmethod
@@ -505,7 +629,7 @@ class AINicheCritic:
                 question="Are attributes sufficient?",
                 assessment="CONCERN",
                 details=f"Only {total_attrs} attributes defined across all entities. Content may lack numerical depth.",
-                recommendation="Add key physical dimensions, capacities, electrical ratings, or certifications."
+                recommendation="Add key physical dimensions, capacities, electrical ratings, or specifications."
             ))
             suggestions.append("Expand attribute dictionary to include primary datasheets.")
         else:
@@ -522,7 +646,7 @@ class AINicheCritic:
                     question="Can compatibility actually be calculated?",
                     assessment="ACTIONABLE_SUGGESTION",
                     details="Compatibility is enabled but no deterministic rules exist.",
-                    recommendation="Add at least one rule with physical dimension or electrical tolerance conditions."
+                    recommendation="Add at least one rule with physical dimension or operational tolerance conditions."
                 ))
             else:
                 findings.append(CriticFinding(
@@ -559,7 +683,7 @@ class AINicheCritic:
                 question="Is the niche too broad?",
                 assessment="CONCERN",
                 details="Niche spans more than 8 entity types. Risk of spreading authority too thin.",
-                recommendation="Narrow niche focus to a tight cluster of interacting hardware products."
+                recommendation="Narrow niche focus to a tight cluster of interacting products."
             ))
             suggestions.append("Consider splitting into two sub-niche sites.")
         else:
@@ -576,7 +700,7 @@ class AINicheCritic:
                 question="Are critical facts obtainable?",
                 assessment="ACTIONABLE_SUGGESTION",
                 details="No attributes marked as CRITICAL. Defining critical attributes ensures quality gates protect factual integrity.",
-                recommendation="Mark primary dimensions and safety ratings as critical."
+                recommendation="Mark primary dimensions and specifications as critical."
             ))
         else:
             findings.append(CriticFinding(
@@ -600,7 +724,7 @@ class AINicheCritic:
             findings.append(CriticFinding(
                 question="Are there obvious YMYL/safety risks?",
                 assessment="SATISFACTORY",
-                details=f"Risk profile '{spec.risk_profile.value}' is well-calibrated for hardware/appliances."
+                details=f"Risk profile '{spec.risk_profile.value}' is well-calibrated for physical consumer and commercial products."
             ))
 
         # Q8: Could this niche create unique utility?
@@ -647,6 +771,7 @@ class AINicheCritic:
 class DataAvailabilityScore:
     """
     Evaluates whether factual structured data is obtainable prior to site activation.
+    Pure generic metrics without domain-specific hardcoding.
     """
 
     @classmethod
@@ -690,11 +815,11 @@ class DataAvailabilityScore:
             can_activate = False
 
         notes = {
-            "authoritative_source_availability": "Manufacturer technical PDFs and certification lab databases available.",
+            "authoritative_source_availability": "Manufacturer technical specifications and documentation registers available.",
             "structured_specification_availability": f"{sum(len(a) for a in spec.attributes.values())} distinct data points modelled.",
             "entity_coverage": f"{len(spec.entity_types)} entity types provide sufficient domain depth.",
             "relationship_calculability": f"{len(spec.calculations)} formulas and {len(spec.compatibility_rules)} rules.",
-            "commercial_product_availability": "Amazon / Retail merchant product catalogs readily scrapable.",
+            "commercial_product_availability": "Retail merchant product catalogs readily scrapable.",
             "source_accessibility": "Public datasheets and manuals accessible without paywalls."
         }
 
@@ -705,7 +830,7 @@ class DataAvailabilityScore:
             can_activate=can_activate,
             dimensions=dimensions,
             dimension_notes=notes,
-            recommended_sources=["Manufacturer Datasheets", "AHAM / EPA / Safety Certification Registers", "Retailer Manual Repositories"]
+            recommended_sources=["Manufacturer Technical Datasheets", "Independent Testing Repositories", "Retail Specification Catalogs"]
         )
 
     @classmethod
@@ -742,10 +867,10 @@ class MarketResearchEstimator:
             niche_id=spec.niche_id,
             commercial_viability="HIGH — High-ticket products with ongoing consumable accessories.",
             estimated_serp_competitor_mix=competitor_mix,
-            top_competitors=["ConsumerReports", "Wirecutter", "Manufacturer Official Portals", "Reddit User Communities"],
-            affiliate_ecosystem_status="ACTIVE — Broad Amazon Associates, Home Depot, and direct manufacturer affiliate programs.",
+            top_competitors=["ConsumerGuides", "IndependentReviewPortals", "ManufacturerPortals", "UserCommunities"],
+            affiliate_ecosystem_status="ACTIVE — Broad retailer and direct manufacturer affiliate programs available.",
             data_richness="EXCELLENT — Clear engineering units (dimensions, watts, capacities, decibels).",
-            strategic_opportunity="Opportunity to outrank thin affiliate blogs by embedding deterministic calculators and certified fitment cards."
+            strategic_opportunity="Opportunity to outrank thin affiliate blogs by embedding deterministic calculators and verified fitment cards."
         )
 
     @classmethod
@@ -762,4 +887,3 @@ class MarketResearchEstimator:
             "strategic_opportunity": report.strategic_opportunity,
             "warning_notice": report.warning_notice
         }
-
