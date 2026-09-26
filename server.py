@@ -58,6 +58,9 @@ WEB_DIR = Path(__file__).parent / "web"
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
+STATIC_DIR = WEB_DIR / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ----------------- Health & Liveness Probes -----------------
 @app.get("/health/live")
