@@ -367,10 +367,38 @@ class DurableJobEngine:
                 "error": row[6],
                 "result": res_dict,
                 "locked_by": row[8],
-                "lease_expires_at": str(row[9]) if row[9] else None
+                "lease_expires_at": str(row[9]) if row[9] else None,
+                "friendly_status": self.get_friendly_status({"status": row[2], "task_type": row[1]})
             }
         finally:
             session.close()
+
+    @classmethod
+    def get_friendly_status(cls, job: Dict[str, Any]) -> str:
+        """
+        Translates raw backend states into clear, human-understandable product labels:
+        Waiting, Researching, Analyzing, Writing, Checking, Completed, Failed.
+        """
+        raw_status = str(job.get("status", "")).upper()
+        task_type = str(job.get("task_type", "")).lower()
+
+        if raw_status == "QUEUED":
+            return "Waiting"
+        elif raw_status == "SUCCEEDED":
+            return "Completed"
+        elif raw_status == "FAILED":
+            return "Failed"
+        elif raw_status == "RUNNING":
+            if any(k in task_type for k in ["serp", "market", "research", "source", "fetch"]):
+                return "Researching"
+            elif any(k in task_type for k in ["calc", "suitability", "compatibility", "model"]):
+                return "Analyzing"
+            elif any(k in task_type for k in ["draft", "write", "content", "generator"]):
+                return "Writing"
+            elif any(k in task_type for k in ["validate", "gate", "quality", "audit"]):
+                return "Checking"
+            return "Writing"
+        return "Waiting"
 
     def list_dead_letter_jobs(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lists all dead-lettered jobs in the database."""

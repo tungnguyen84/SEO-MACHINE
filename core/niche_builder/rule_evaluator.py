@@ -19,19 +19,22 @@ class DeclarativeRuleEvaluator:
     @classmethod
     def evaluate_rule(
         cls,
-        rule: CompatibilityRuleSpec,
+        rule: Any,
         subject: Dict[str, Any],
         target: Dict[str, Any],
         context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    ) -> Any:
+        if isinstance(rule, dict):
+            rule = CompatibilityRuleSpec(**rule)
+
         if len(rule.conditions) > cls.MAX_CONDITIONS:
             raise ValueError(
                 f"Rule '{rule.name}' has {len(rule.conditions)} conditions, exceeding maximum of {cls.MAX_CONDITIONS}."
             )
 
         ctx = context or {}
-        s_attrs = ctx.get("subject_attrs", {})
-        t_attrs = ctx.get("target_attrs", {})
+        s_attrs = ctx.get("subject_attrs", {}) or subject
+        t_attrs = ctx.get("target_attrs", {}) or target
 
         condition_results: List[bool] = []
         condition_details: List[str] = []

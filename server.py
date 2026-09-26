@@ -1439,6 +1439,95 @@ async def api_saas_import_niche(
         raise HTTPException(status_code=400, detail=f"Lỗi import ngách: {str(e)}")
 
 
+# ==============================================================================
+# EDITORIAL REVIEW, CLAIM INSPECTOR & JOB VISIBILITY APIS
+# ==============================================================================
+from core.writer.claim_inspector import ClaimInspector, EditorialReviewStore, EditorialReviewItem, UserFacingClaim
+from core.jobs.durable_queue import DurableJobEngine
+
+class EditorialActionRequest(BaseModel):
+    action: str  # "APPROVE" | "REJECT" | "REQUEST_REWRITE" | "EDIT"
+    feedback: Optional[str] = None
+    edited_content: Optional[str] = None
+
+@app.get("/api/v1/saas/articles/{article_id}/editorial-preview")
+async def api_get_editorial_preview(
+    article_id: str,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Lấy dữ liệu bài viết kèm danh sách claims và phân loại nguồn gốc rõ ràng."""
+    item = EditorialReviewStore.get_item(article_id)
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Article '{article_id}' not found in review queue")
+    return {"success": True, "article": item.model_dump()}
+
+@app.post("/api/v1/saas/articles/{article_id}/editorial-action")
+async def api_editorial_action(
+    article_id: str,
+    req: EditorialActionRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Thực hiện hành động biên tập (Preview, Edit, Approve, Reject, Request Rewrite)."""
+    item = EditorialReviewStore.get_item(article_id)
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Article '{article_id}' not found in review queue")
+    
+    act = req.action.upper()
+    if act == "APPROVE":
+        item.status = "APPROVED"
+    elif act == "REJECT":
+        item.status = "REJECTED"
+    elif act == "REQUEST_REWRITE":
+        item.status = "REWRITE_REQUESTED"
+    elif act == "EDIT" and req.edited_content:
+        item.content_markdown = req.edited_content
+        item.status = "EDITED"
+    else:
+        raise HTTPException(status_code=400, detail=f"Hành động '{req.action}' không hợp lệ")
+
+    if req.feedback:
+        item.user_feedback = req.feedback
+    
+    EditorialReviewStore.save_item(item)
+    return {"success": True, "article": item.model_dump(), "message": f"Article {article_id} updated to {item.status}"}
+
+@app.get("/api/v1/saas/jobs/{job_id}/friendly-status")
+async def api_get_friendly_job_status(
+    job_id: str,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Hiển thị trạng thái tiến trình thân thiện cho người dùng cuối."""
+    engine = DurableJobEngine()
+    job = engine.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    return {"success": True, "job": job}
+
+@app.post("/api/v1/saas/jobs/{job_id}/safe-retry")
+async def api_safe_job_retry(
+    job_id: str,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Cho phép retry an toàn khi gặp lỗi mà không hiển thị stack trace kỹ thuật."""
+    engine = DurableJobEngine()
+    job = engine.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    
+    # Reset job to QUEUED for retry
+    from core.database import get_db_session
+    from sqlalchemy import text
+    session = get_db_session()
+    try:
+        session.execute(text("UPDATE jobs SET status = 'QUEUED', error = NULL, locked_by = NULL, lease_expires_at = NULL WHERE id = :id"), {"id": job_id})
+        session.commit()
+    finally:
+        session.close()
+
+    updated_job = engine.get_job(job_id)
+    return {"success": True, "message": "Job đã được đưa lại vào hàng đợi an toàn.", "job": updated_job}
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 Đang khởi động Full SaaS Suite tại: http://localhost:8000")
