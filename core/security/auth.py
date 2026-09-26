@@ -13,7 +13,7 @@ import hmac
 import hashlib
 import uuid
 from typing import Optional, Dict, Any
-from fastapi import Header, HTTPException, Depends
+from fastapi import Header, HTTPException, Depends, Cookie
 from core.niche_builder.schema import PermissionRole
 
 
@@ -158,27 +158,34 @@ class AuthenticatedUser:
         }
 
 
-def get_authenticated_user(authorization: Optional[str] = Header(None)) -> AuthenticatedUser:
+def get_authenticated_user(
+    authorization: Optional[str] = Header(None),
+    openseo_token: Optional[str] = Cookie(None)
+) -> AuthenticatedUser:
     """
     FastAPI Dependency: Strictly enforces Bearer authentication on protected SaaS endpoints.
+    Supports both Authorization: Bearer <token> header and secure openseo_token cookie for browser access.
     Rejects requests without valid token (No dev backdoors).
     """
-    if not authorization:
+    token = None
+    if authorization:
+        parts = authorization.split(" ", 1)
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise HTTPException(
+                status_code=401,
+                detail="Authorization header must follow 'Bearer <token>' format",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        token = parts[1].strip()
+    elif openseo_token:
+        token = openseo_token.strip()
+    else:
         raise HTTPException(
             status_code=401,
             detail="Authorization header is required (Bearer token)",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    parts = authorization.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization header must follow 'Bearer <token>' format",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-
-    token = parts[1].strip()
     payload = TokenManager.verify_token(token)
 
     return AuthenticatedUser(

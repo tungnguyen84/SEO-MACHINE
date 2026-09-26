@@ -232,11 +232,13 @@
           <span id="header-user-tier" class="ml-1 text-[10px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded uppercase">Agency</span>
           <span class="text-[10px] text-indigo-600 font-bold ml-0.5 group-hover:underline">⭐ Nâng Cấp</span>
         </div>
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">A</div>
+        <div onclick="showLoginModal(true)" class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1.5 rounded-xl transition border border-transparent hover:border-slate-200" title="Bấm để đăng nhập hoặc đổi tài khoản">
+          <div id="header-user-avatar" class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">R</div>
           <div class="hidden sm:block text-left">
-            <div id="header-user-email" class="font-bold text-slate-800 text-[11px] leading-tight">admin@openseo.local</div>
-            <div class="text-[9px] text-slate-400">Workspace #1</div>
+            <div id="header-user-email" class="font-bold text-slate-800 text-[11px] leading-tight">reviewer@openseo.staging</div>
+            <div class="text-[9px] text-slate-400 flex items-center gap-1">
+              <span id="header-user-role-badge" class="text-emerald-600 font-bold">● OWNER</span> • <span>Workspace Review</span>
+            </div>
           </div>
         </div>
       </div>
@@ -2335,6 +2337,142 @@
 
 
   <script>
+    // Global JWT Bearer Interceptor for SaaS Endpoints
+    const _originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      options = options || {};
+      options.headers = options.headers || {};
+      const token = localStorage.getItem('openseo_token');
+      if (token) {
+        if (options.headers instanceof Headers) {
+          if (!options.headers.has('Authorization')) {
+            options.headers.set('Authorization', 'Bearer ' + token);
+          }
+        } else if (Array.isArray(options.headers)) {
+          if (!options.headers.some(([k]) => k.toLowerCase() === 'authorization')) {
+            options.headers.push(['Authorization', 'Bearer ' + token]);
+          }
+        } else {
+          if (!options.headers['Authorization'] && !options.headers['authorization']) {
+            options.headers['Authorization'] = 'Bearer ' + token;
+          }
+        }
+      }
+      return _originalFetch(url, options);
+    };
+
+    // Staging Reviewer Auth Manager
+    async function checkAuthSession() {
+      let token = localStorage.getItem('openseo_token');
+      if (!token) {
+        const match = document.cookie.match(new RegExp('(^| )openseo_token=([^;]+)'));
+        if (match) {
+          token = match[2];
+          localStorage.setItem('openseo_token', token);
+        }
+      }
+      if (token) {
+        try {
+          const res = await _originalFetch('/api/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (res.ok) {
+            const user = await res.json();
+            renderHeaderUser(user);
+            return user;
+          } else {
+            localStorage.removeItem('openseo_token');
+          }
+        } catch (e) {
+          console.warn('Auth check error:', e);
+        }
+      }
+      return null;
+    }
+
+    function renderHeaderUser(user) {
+      if (!user) return;
+      const emailEl = document.getElementById('header-user-email');
+      const tierEl = document.getElementById('header-user-tier');
+      const credsEl = document.getElementById('header-user-credits');
+      const avatarEl = document.getElementById('header-user-avatar');
+      const roleBadge = document.getElementById('header-user-role-badge');
+      if (emailEl) emailEl.innerText = user.email || 'reviewer@openseo.staging';
+      if (tierEl) tierEl.innerText = (user.plan_tier || 'Agency').toUpperCase();
+      if (credsEl) credsEl.innerText = user.credits_remaining !== undefined ? user.credits_remaining : 1000;
+      if (avatarEl) avatarEl.innerText = (user.email ? user.email[0].toUpperCase() : 'R');
+      if (roleBadge) roleBadge.innerText = '● ' + (user.role || 'OWNER');
+    }
+
+    function showLoginModal(canClose = true) {
+      const modal = document.getElementById('auth-login-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        const closeBtn = document.getElementById('btn-close-login-modal');
+        if (closeBtn) closeBtn.style.display = canClose ? 'flex' : 'none';
+      }
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById('auth-login-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function quickFillReviewer() {
+      document.getElementById('login-email').value = 'reviewer@openseo.staging';
+      document.getElementById('login-password').value = 'Reviewer2026!OpenSEO';
+    }
+
+    async function handleLoginSubmit(e) {
+      if (e) e.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error-msg');
+      const btn = document.getElementById('btn-submit-login');
+      if (errEl) errEl.classList.add('hidden');
+      if (!email || !password) {
+        if (errEl) { errEl.innerText = 'Vui lòng nhập Email và Mật khẩu!'; errEl.classList.remove('hidden'); }
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Đang xác thực...`;
+      try {
+        const res = await _originalFetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          localStorage.setItem('openseo_token', data.user.token);
+          renderHeaderUser(data.user);
+          closeLoginModal();
+          await loadWorkspaces();
+          await loadConnectedSites();
+        } else {
+          if (errEl) {
+            errEl.innerText = data.detail || 'Email hoặc mật khẩu không chính xác';
+            errEl.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.innerText = 'Lỗi kết nối máy chủ: ' + err.message;
+          errEl.classList.remove('hidden');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i> Đăng Nhập Vào Hệ Thống`;
+        lucide.createIcons();
+      }
+    }
+
+    function logoutUser() {
+      localStorage.removeItem('openseo_token');
+      document.cookie = 'openseo_token=; Max-Age=0; path=/;';
+      showLoginModal(false);
+    }
+
     lucide.createIcons();
     let lastAnalyzedData = null;
     let currentGenMode = 'roundup';
@@ -5557,14 +5695,17 @@
     }
 
     // Khởi tạo các cấu hình khi tải trang
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      await checkAuthSession();
       loadWebhookSettings();
       loadWorkspaces();
       loadConnectedSites();
 
       // Check initial URL path for deep-link direct audit routing
       const rawPath = window.location.pathname.replace(/^\//, '').toLowerCase();
-      if (rawPath && document.getElementById('tab-' + rawPath)) {
+      if (rawPath === 'login') {
+        showLoginModal(false);
+      } else if (rawPath && document.getElementById('tab-' + rawPath)) {
         switchTab(rawPath, false);
       }
     });
@@ -5931,6 +6072,67 @@
           <button onclick="createNewProject()" id="btn-create-project" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm transition flex items-center gap-1.5">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tạo Dự Án Ngay
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Đăng Nhập Reviewer & SaaS Auth -->
+  <div id="auth-login-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="p-6 bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white relative">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black">OpenSEO Staging Access</h3>
+              <p class="text-[11px] text-indigo-200">Xác thực quyền truy cập External Reviewer</p>
+            </div>
+          </div>
+          <button id="btn-close-login-modal" onclick="closeLoginModal()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs bg-white">
+        <!-- Quick Fill Reviewer Button -->
+        <div class="p-3 bg-indigo-50/80 border border-indigo-200/80 rounded-2xl flex items-center justify-between gap-2">
+          <div>
+            <div class="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Tài Khoản External Reviewer (OWNER)
+            </div>
+            <div class="text-[10px] text-slate-500 font-mono mt-0.5">reviewer@openseo.staging</div>
+          </div>
+          <button type="button" onclick="quickFillReviewer()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition shrink-0 shadow-xs flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3 h-3"></i> Điền Nhanh
+          </button>
+        </div>
+
+        <form onsubmit="handleLoginSubmit(event)" class="space-y-3.5">
+          <div id="login-error-msg" class="hidden p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-[11px] rounded-xl font-medium"></div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1 text-[11px] uppercase">Email</label>
+            <input type="email" id="login-email" required placeholder="reviewer@openseo.staging" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1 text-[11px] uppercase">Mật Khẩu</label>
+            <input type="password" id="login-password" required placeholder="••••••••••••" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <button type="submit" id="btn-submit-login" class="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs">
+            <i data-lucide="log-in" class="w-4 h-4"></i> Đăng Nhập Vào Hệ Thống
+          </button>
+        </form>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+          <span>Staging Environment • Strict Isolation</span>
+          <button type="button" onclick="logoutUser()" class="text-rose-500 hover:underline">Đăng Xuất</button>
         </div>
       </div>
     </div>

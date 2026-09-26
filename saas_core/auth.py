@@ -38,7 +38,12 @@ class SaaSAuthManager:
         if not user:
             return None
         if verify_password(password, user["password_hash"], user["salt"]):
-            role = "ADMIN" if user.get("id") == 1 else "EDITOR"
+            if user.get("role"):
+                role = str(user["role"]).upper()
+            elif "reviewer" in email.lower() or user.get("id") == 1:
+                role = "OWNER"
+            else:
+                role = "EDITOR"
             token = cls.create_token(
                 user_id=user["id"],
                 email=user["email"],

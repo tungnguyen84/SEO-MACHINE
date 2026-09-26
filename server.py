@@ -303,6 +303,7 @@ VALID_SPA_TABS = {
     "pagespeed", "schemastudio", "geoseo", "sites", "sentiment", 
     "cloaker", "jobs", "campaign", "repository", "videocreator", "settings",
     "data-entities", "data-compatibility", "data-qualitygate",
+    "saas-niche-studio", "saas-sites", "login",
     "audit", "staging"
 }
 
@@ -341,10 +342,17 @@ async def redirect_cloaked_link(slug: str, request: Request):
 
 # ----------------- SaaS Auth Endpoints -----------------
 @app.post("/api/auth/login")
-async def login(req: LoginRequest):
+async def login(req: LoginRequest, response: Response):
     res = SaaSAuthManager.authenticate_user(req.email, req.password)
     if not res:
         raise HTTPException(status_code=400, detail="Sai email hoặc mật khẩu")
+    response.set_cookie(
+        key="openseo_token",
+        value=res["token"],
+        httponly=False,
+        samesite="lax",
+        max_age=86400 * 30
+    )
     return {"success": True, "user": res}
 
 @app.post("/api/auth/register")
