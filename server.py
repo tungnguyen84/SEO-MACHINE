@@ -1224,6 +1224,21 @@ async def api_saas_list_sites(user: AuthenticatedUser = Depends(get_authenticate
     return {"success": True, "count": len(sites), "sites": [s.model_dump() for s in sites]}
 
 
+@app.delete("/api/v1/saas/sites/{site_id}")
+async def api_saas_delete_site(
+    site_id: str,
+    user: AuthenticatedUser = Depends(get_authenticated_user)
+):
+    """Xóa website SaaS với tenant isolation và phân quyền OWNER."""
+    try:
+        deleted = SaaSSiteManager.delete_site(site_id, user_id=user.user_id, tenant_id=user.tenant_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Site không tồn tại")
+        return {"success": True, "message": f"Đã xóa site '{site_id}'"}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+
+
 @app.get("/api/v1/saas/sites/{site_id}/dashboard")
 async def api_saas_site_dashboard(
     site_id: str,

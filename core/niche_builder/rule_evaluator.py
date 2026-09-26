@@ -152,18 +152,26 @@ class DeclarativeRuleEvaluator:
             return passed, f"'{val_s}' != '{val_t}'"
 
         elif op_clean in (">", "GT"):
+            if not is_s_num or not is_t_num:
+                return False, f"Operator '{op}' requires numeric values, got '{val_s}' and '{val_t}'"
             passed = float(val_s) > float(val_t)
             return passed, f"{val_s} > {val_t}"
 
         elif op_clean in (">=", "GTE"):
+            if not is_s_num or not is_t_num:
+                return False, f"Operator '{op}' requires numeric values, got '{val_s}' and '{val_t}'"
             passed = float(val_s) >= (float(val_t) - tolerance)
             return passed, f"{val_s} >= {val_t} (tolerance {tolerance})"
 
         elif op_clean in ("<", "LT"):
+            if not is_s_num or not is_t_num:
+                return False, f"Operator '{op}' requires numeric values, got '{val_s}' and '{val_t}'"
             passed = float(val_s) < float(val_t)
             return passed, f"{val_s} < {val_t}"
 
         elif op_clean in ("<=", "LTE"):
+            if not is_s_num or not is_t_num:
+                return False, f"Operator '{op}' requires numeric values, got '{val_s}' and '{val_t}'"
             passed = float(val_s) <= (float(val_t) + tolerance)
             return passed, f"{val_s} <= {val_t} (tolerance {tolerance})"
 
@@ -175,15 +183,19 @@ class DeclarativeRuleEvaluator:
             return passed, f"'{val_s}' IN [{', '.join(str(x) for x in target_set)}]"
 
         elif op_clean == "RANGE":
-            # val_t expected as [min_val, max_val] or "min_val,max_val"
-            if isinstance(val_t, (list, tuple)) and len(val_t) >= 2:
-                min_v, max_v = float(val_t[0]), float(val_t[1])
-            else:
-                parts = [float(x.strip()) for x in str(val_t).split(",")]
-                min_v, max_v = parts[0], parts[1]
-            num_s = float(val_s)
-            passed = (min_v - tolerance) <= num_s <= (max_v + tolerance)
-            return passed, f"{min_v} <= {num_s} <= {max_v}"
+            if not is_s_num:
+                return False, f"Operator RANGE requires numeric source value, got '{val_s}'"
+            try:
+                if isinstance(val_t, (list, tuple)) and len(val_t) >= 2:
+                    min_v, max_v = float(val_t[0]), float(val_t[1])
+                else:
+                    parts = [float(x.strip()) for x in str(val_t).split(",")]
+                    min_v, max_v = parts[0], parts[1]
+                num_s = float(val_s)
+                passed = (min_v - tolerance) <= num_s <= (max_v + tolerance)
+                return passed, f"{min_v} <= {num_s} <= {max_v}"
+            except (ValueError, TypeError, IndexError):
+                return False, f"Operator RANGE received invalid target range '{val_t}'"
 
         elif op_clean == "CONTAINS":
             passed = str(val_t).strip().lower() in str(val_s).strip().lower()

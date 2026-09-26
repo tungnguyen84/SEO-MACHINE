@@ -1,5 +1,5 @@
 {
-  "combined_core_sha256": "42ae4570d6a918a41d5df21017a5351ef2341e599087c0c07487de78979e9ebb",
+  "combined_core_sha256": "e416e41530efa244f98844dd393f3b1f1c62df6ee369fbd6a639304bd80a1d46",
   "file_count": 18,
   "files": {
     "core/entities/__init__.py": "15e5d5dc11750854cc2253b788bb0528a5bdba2861ac291a090c58ec909cc870",
@@ -8,7 +8,7 @@
     "core/entities/models.py": "261dedd888b007d474d287ce53ee59ae87b3f943041c0db3da33f202c972d7c9",
     "core/entities/normalizer.py": "1394b8562d17bf5e9e36956a41ea786d90f11643f1886cb089741e09f396b919",
     "core/niche_builder/ai_designer.py": "709a47b09dd861bc60639ac1d2ec757bc5b65a2c70f443a830a0a719c510f1c7",
-    "core/niche_builder/rule_evaluator.py": "ff18616f0d335cff67d8950abbd4e21479ae9bc6c68bb524904d567c9eadfad3",
+    "core/niche_builder/rule_evaluator.py": "babf525736d29714d98384c18bf0af9cd69712505e111085f1b3f62b2ef6f408",
     "core/niche_builder/safe_formula.py": "a7b0da86b4d3a8775d90bf180953a2577887228ad63a07c25d51a7137f97ebf4",
     "core/niche_builder/sandbox.py": "08d1ed43a0ffca8af41dc291b2a20d5b71277f1c199d3c4056dd35026a7baea3",
     "core/niche_builder/schema.py": "0b90cadc3ede4432551807c75e81f443cdf7ff9b8460f899e2b76adc242bf8e2",

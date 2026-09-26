@@ -8,6 +8,7 @@
   <script src="/static/tailwind.js"></script>
   <script src="/static/lucide.min.js"></script>
   <style>
+    .hidden { display: none !important; }
     [x-cloak] { display: none !important; }
     .subtab-active { border-bottom: 2px solid #4f46e5; color: #4f46e5; font-weight: 700; }
   </style>
@@ -2339,7 +2340,7 @@
   <script>
     // Global JWT Bearer Interceptor for SaaS Endpoints
     const _originalFetch = window.fetch;
-    window.fetch = function(url, options = {}) {
+    window.fetch = async function(url, options = {}) {
       options = options || {};
       options.headers = options.headers || {};
       const token = localStorage.getItem('openseo_token');
@@ -2358,7 +2359,13 @@
           }
         }
       }
-      return _originalFetch(url, options);
+      const response = await _originalFetch(url, options);
+      if (response.status === 401 && typeof url === 'string' && !url.includes('/api/auth/login')) {
+        console.warn('Yêu cầu chưa xác thực:', url, '-> Hiển thị hộp thoại đăng nhập.');
+        quickFillReviewer();
+        showLoginModal(false);
+      }
+      return response;
     };
 
     // Staging Reviewer Auth Manager
@@ -2387,6 +2394,8 @@
           console.warn('Auth check error:', e);
         }
       }
+      quickFillReviewer();
+      showLoginModal(false);
       return null;
     }
 
@@ -2449,6 +2458,8 @@
           closeLoginModal();
           await loadWorkspaces();
           await loadConnectedSites();
+          if (typeof loadSaaSSites === 'function') loadSaaSSites();
+          if (typeof loadRecentArticles === 'function') loadRecentArticles();
         } else {
           if (errEl) {
             errEl.innerText = data.detail || 'Email hoặc mật khẩu không chính xác';
@@ -6117,12 +6128,12 @@
 
           <div>
             <label class="block font-bold text-slate-700 mb-1 text-[11px] uppercase">Email</label>
-            <input type="email" id="login-email" required placeholder="reviewer@openseo.staging" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="email" id="login-email" required value="reviewer@openseo.staging" placeholder="reviewer@openseo.staging" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
           <div>
             <label class="block font-bold text-slate-700 mb-1 text-[11px] uppercase">Mật Khẩu</label>
-            <input type="password" id="login-password" required placeholder="••••••••••••" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="password" id="login-password" required value="Reviewer2026!OpenSEO" placeholder="••••••••••••" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
           <button type="submit" id="btn-submit-login" class="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs">

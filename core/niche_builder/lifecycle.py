@@ -124,6 +124,18 @@ class SaaSSiteManager:
         return list(cls._sites.values())
 
     @classmethod
+    def delete_site(cls, site_id: str, user_id: str = "user_admin", tenant_id: Optional[str] = None) -> bool:
+        """Deletes a site with tenant isolation and OWNER role verification."""
+        site = cls._sites.get(site_id)
+        if not site:
+            return False
+        if tenant_id and site.tenant_id != tenant_id:
+            raise PermissionError(f"Cross-tenant access forbidden: Tenant '{tenant_id}' cannot delete site '{site_id}'.")
+        cls.verify_permission(site_id, user_id, required_roles=[PermissionRole.OWNER])
+        cls._sites.pop(site_id, None)
+        return True
+
+    @classmethod
     def update_lifecycle_status(
         cls,
         site_id: str,
